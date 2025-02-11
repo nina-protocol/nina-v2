@@ -1,0 +1,677 @@
+{
+  "version": "0.1.0",
+  "name": "orp",
+  "instructions": [
+    {
+      "name": "createOrpAccount",
+      "accounts": [
+        {
+          "name": "signer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "orpAccountAuthority",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "selfProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "cpiAuthorityPda",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "lightSystemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "accountCompressionProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "registeredProgramPda",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "noopProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "accountCompressionAuthority",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "proof",
+          "type": {
+            "defined": "AnchorCompressedProof"
+          }
+        },
+        {
+          "name": "addressMerkleTreeRootIndex",
+          "type": "u16"
+        },
+        {
+          "name": "orpConfig",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "createOrpConfig",
+      "accounts": [
+        {
+          "name": "signer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "selfProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "cpiAuthorityPda",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "pool",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "lightSystemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "accountCompressionProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "registeredProgramPda",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "noopProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "accountCompressionAuthority",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "proof",
+          "type": {
+            "defined": "AnchorCompressedProof"
+          }
+        },
+        {
+          "name": "addressMerkleTreeRootIndex",
+          "type": "u16"
+        },
+        {
+          "name": "address",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "firstMinterPercent",
+          "type": "u64"
+        },
+        {
+          "name": "inviteReferralPercent",
+          "type": "u64"
+        },
+        {
+          "name": "purchaseReferralPercent",
+          "type": "u64"
+        },
+        {
+          "name": "topSupportersPercent",
+          "type": "u64"
+        },
+        {
+          "name": "treasuryPercent",
+          "type": "u64"
+        },
+        {
+          "name": "feeBasisPoints",
+          "type": "u64"
+        },
+        {
+          "name": "feeBase",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "deposit",
+      "accounts": [
+        {
+          "name": "signer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "selfProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "cpiAuthorityPda",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "pool",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "depositerTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "treasuryTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "lightSystemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "accountCompressionProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "registeredProgramPda",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "noopProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "accountCompressionAuthority",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "proof",
+          "type": {
+            "defined": "CompressedProof"
+          }
+        },
+        {
+          "name": "merkleContext",
+          "type": {
+            "defined": "MerkleContext"
+          }
+        },
+        {
+          "name": "merkleTreeRootIndex",
+          "type": "u16"
+        },
+        {
+          "name": "accountLeafIndexes",
+          "type": {
+            "vec": "u32"
+          }
+        },
+        {
+          "name": "orpConfig",
+          "type": {
+            "defined": "OrpConfigInputParameter"
+          }
+        },
+        {
+          "name": "accountIds",
+          "type": {
+            "vec": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        },
+        {
+          "name": "accounts",
+          "type": {
+            "vec": {
+              "defined": "OrpAccountInputParameter"
+            }
+          }
+        },
+        {
+          "name": "depositAmount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "withdraw",
+      "accounts": [
+        {
+          "name": "signer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "selfProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "cpiAuthorityPda",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "pool",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "withdrawTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "lightSystemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "accountCompressionProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "registeredProgramPda",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "noopProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "accountCompressionAuthority",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "proof",
+          "type": {
+            "defined": "CompressedProof"
+          }
+        },
+        {
+          "name": "merkleContext",
+          "type": {
+            "defined": "MerkleContext"
+          }
+        },
+        {
+          "name": "merkleTreeRootIndex",
+          "type": "u16"
+        },
+        {
+          "name": "accountLeafIndex",
+          "type": "u32"
+        },
+        {
+          "name": "orpConfig",
+          "type": {
+            "defined": "OrpConfigInputParameter"
+          }
+        },
+        {
+          "name": "accountId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "account",
+          "type": {
+            "defined": "OrpAccountInputParameter"
+          }
+        },
+        {
+          "name": "withdrawAmount",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "types": [
+    {
+      "name": "CompressedProof",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "a",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "b",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          },
+          {
+            "name": "c",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "AnchorCompressedProof",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "a",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "b",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          },
+          {
+            "name": "c",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OrpAccountInputParameter",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "config",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "amountOwed",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OrpConfigInputParameter",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "address",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "authority",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "pool",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "firstMinterPercent",
+            "type": "u64"
+          },
+          {
+            "name": "inviteReferralPercent",
+            "type": "u64"
+          },
+          {
+            "name": "purchaseReferralPercent",
+            "type": "u64"
+          },
+          {
+            "name": "topSupportersPercent",
+            "type": "u64"
+          },
+          {
+            "name": "treasuryPercent",
+            "type": "u64"
+          },
+          {
+            "name": "feeBasisPoints",
+            "type": "u64"
+          },
+          {
+            "name": "feeBase",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MerkleContext",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merkleTreePubkeyIndex",
+            "type": "u8"
+          },
+          {
+            "name": "nullifierQueuePubkeyIndex",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidAuthority",
+      "msg": "Authority is not the owner or delegate"
+    },
+    {
+      "code": 6001,
+      "name": "InvalidMerkleTrees",
+      "msg": "Invalid merkle trees"
+    },
+    {
+      "code": 6002,
+      "name": "InvalidConfigPercentTotal",
+      "msg": "ORP Config percent total is not 100"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidOrpPool",
+      "msg": "ORP Pool for deposit is invalid"
+    },
+    {
+      "code": 6004,
+      "name": "InvalidOrpConfig",
+      "msg": "Invalid ORP Account for ORP Config"
+    },
+    {
+      "code": 6005,
+      "name": "InvalidDepositOrpAccountIndex",
+      "msg": "Too many deposit accounts supplied"
+    },
+    {
+      "code": 6006,
+      "name": "InvalidDepositOrpInputs",
+      "msg": "Invalid ORP Deposit Inputs"
+    },
+    {
+      "code": 6007,
+      "name": "InsufficientFunds",
+      "msg": "Invalid ORP Withdraw Amount"
+    },
+    {
+      "code": 6008,
+      "name": "ArithmeticError",
+      "msg": "Arithmetic error"
+    },
+    {
+      "code": 6009,
+      "name": "InvalidInputLength",
+      "msg": "Invalid input length"
+    }
+  ],
+  "metadata": {
+    "address": "FUnmsBnsTDEsa5zTcUJixVzwPZZwXNNfmp5ECr2acbYd"
+  }
+}
