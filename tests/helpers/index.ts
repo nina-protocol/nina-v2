@@ -13,10 +13,10 @@ export const buildSignAndSendTransaction = async (
     recentBlockhash: blockhash,
     instructions,
   }).compileToV0Message([...lookupTableAccount])
-  console.log("messageV0", messageV0)
   const tx = new anchor.web3.VersionedTransaction(messageV0)
-  console.log("tx", tx)
   tx.sign([payer, ...additionalSigners])
-  const txid = await connection.sendRawTransaction(tx.serialize())
+  const txid = await connection.sendRawTransaction(tx.serialize(), {
+    skipPreflight: true,
+  })
   return txid;
 };

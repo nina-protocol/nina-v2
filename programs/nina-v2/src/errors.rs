@@ -8,4 +8,6 @@ pub enum NinaError {
     ReleasePurchaseWrongAmount,
     #[msg("Release Purchase sold out")]
     ReleasePurchaseSoldOut,
+    #[msg("Arithmetic error")]
+    ArithmeticError,
 }

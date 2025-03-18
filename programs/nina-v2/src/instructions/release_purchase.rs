@@ -13,6 +13,9 @@ use anchor_spl::{
 use crate::state::ReleaseV2;
 use crate::errors::NinaError;
 
+const BASIS_POINTS: u64 = 1_000_000;
+const ONE_USDC: u64 = 10_000_000;
+const TEN_PERCENT: u64 = 100_000;
 #[derive(Accounts)]
 #[instruction(
   amount: u64,
@@ -64,6 +67,12 @@ pub struct ReleasePurchase<'info> {
         associated_token::authority = receiver,
     )]
     pub receiver_release_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
+    ///TODO: CHECK THAT ADDRESS === EXPECTED CRS ADDRESS
+    #[account(
+      mut,
+      constraint = crs_token_account.mint == release.payment_mint,
+    )]
+    pub crs_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
     pub system_program: Program<'info, System>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub token_program: Program<'info, Token>,
@@ -78,8 +87,8 @@ pub fn handler<'c: 'info, 'info>(
 
     validate_purchase(&ctx, amount)?;
     transfer_payment(&ctx, amount)?;
+    transfer_crs(&ctx, amount)?;
     mint_release_token(&ctx, release_signer_bump)?;
-
     Ok(())
 }
 
@@ -130,4 +139,28 @@ fn mint_release_token(ctx: &Context<ReleasePurchase>, release_signer_bump: u8) -
     );
     
     mint_to(cpi_ctx_mint_to, 1)
+}
+
+fn transfer_crs(ctx: &Context<ReleasePurchase>, amount: u64) -> Result<()> {
+    let mut crs_amount = ONE_USDC;
+    if amount > ONE_USDC {
+        crs_amount = amount
+            .checked_mul(TEN_PERCENT)
+            .ok_or(NinaError::ArithmeticError)?
+            .checked_div(BASIS_POINTS)
+            .ok_or(NinaError::ArithmeticError)?
+    }
+
+    let cpi_accounts = Transfer {
+        from: ctx.accounts.payment_token_account.to_account_info(),
+        to: ctx.accounts.crs_token_account.to_account_info(),
+        authority: ctx.accounts.receiver.to_account_info(),
+    };
+
+    let cpi_ctx_transfer = CpiContext::new(
+        ctx.accounts.token_program.to_account_info(), 
+        cpi_accounts
+    );
+    
+    anchor_spl::token::transfer(cpi_ctx_transfer, crs_amount)
 }
