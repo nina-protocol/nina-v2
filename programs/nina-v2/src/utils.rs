@@ -12,9 +12,9 @@ use anchor_lang::{
 };
 use anchor_spl::token_interface::spl_token_2022::{
   extension::{BaseStateWithExtensions, Extension, StateWithExtensions},
-  solana_zk_token_sdk::zk_token_proof_instruction::Pod,
   state::Mint,
 };
+use solana_zk_token_sdk::zk_token_proof_instruction::Pod;
 use spl_tlv_account_resolution::{account::ExtraAccountMeta, state::ExtraAccountMetaList};
 use spl_type_length_value::variable_len_pack::VariableLenPack;
 
@@ -34,15 +34,6 @@ pub fn update_account_lamports_to_minimum_balance<'info>(
       )?;
   }
   Ok(())
-}
-
-pub fn get_mint_extensible_extension_data<T: Extension + VariableLenPack>(
-  account: &mut AccountInfo,
-) -> Result<T> {
-  let mint_data = account.data.borrow();
-  let mint_with_extension = StateWithExtensions::<Mint>::unpack(&mint_data)?;
-  let extension_data = mint_with_extension.get_variable_len_extension::<T>()?;
-  Ok(extension_data)
 }
 
 pub fn get_mint_extension_data<T: Extension + Pod>(account: &mut AccountInfo) -> Result<T> {

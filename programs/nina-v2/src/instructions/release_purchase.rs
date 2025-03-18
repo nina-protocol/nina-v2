@@ -10,15 +10,6 @@ use anchor_spl::{
     token_2022::{MintTo, mint_to},
 };
 
-use crate::orp::cpi::deposit;
-use crate::orp::cpi::accounts::Deposit;
-use crate::orp::types::{
-  MerkleContext,
-  CompressedProof,
-  OrpConfigInputParameter,
-  OrpAccountInputParameter,
-};
-use crate::orp::program::Orp;
 use crate::state::ReleaseV2;
 use crate::errors::NinaError;
 
@@ -26,13 +17,6 @@ use crate::errors::NinaError;
 #[instruction(
   amount: u64,
   release_signer_bump: u8,
-  proof: CompressedProof,
-  merkle_context: MerkleContext,
-  merkle_tree_root_index: u16,
-  account_leaf_indexes: Vec<u32>,
-  orp_config: OrpConfigInputParameter,
-  account_ids: Vec<[u8; 32]>,
-  accounts: Vec<OrpAccountInputParameter>,
 )]
 pub struct ReleasePurchase<'info> {
     #[account(mut)]
@@ -84,55 +68,18 @@ pub struct ReleasePurchase<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub token_program: Program<'info, Token>,
     pub token_2022_program: Program<'info, Token2022>,
-    pub orp_program: Program<'info, Orp>,
-    /// CHECK: This is checked by the light system program via cpi
-    pub orp_cpi_authority_pda: UncheckedAccount<'info>,
-    /// CHECK: This is checked by the light system program via cpi
-    #[account(mut)]
-    pub orp_pool: UncheckedAccount<'info>,
-    /// CHECK: This is checked by the light system program via cpi
-    #[account(mut)]
-    pub treasury_token_account: UncheckedAccount<'info>,
-    /// CHECK: This is checked by the light system program via cpi
-    pub light_system_program: UncheckedAccount<'info>,
-    /// CHECK: This is checked by the light system program via cpi
-    pub account_compression_authority: UncheckedAccount<'info>,
-    /// CHECK: This is checked by the light system program via cpi
-    pub noop_program: UncheckedAccount<'info>,
-    /// CHECK: This is checked by the light system program via cpi
-    pub account_compression_program: UncheckedAccount<'info>,
-    /// CHECK: This is checked by the light system program via cpi
-    pub registered_program_pda: AccountInfo<'info>,
 }
 
 pub fn handler<'c: 'info, 'info>(
     ctx: Context<'_, '_, 'c, 'info, ReleasePurchase<'info>>,
     amount: u64,
     release_signer_bump: u8,
-    proof: CompressedProof,
-    merkle_context: MerkleContext,
-    merkle_tree_root_index: u16,
-    account_leaf_indexes: Vec<u32>,
-    orp_config: OrpConfigInputParameter,
-    account_ids: Vec<[u8; 32]>,
-    accounts: Vec<OrpAccountInputParameter>,
 ) -> Result<()> {
+
     validate_purchase(&ctx, amount)?;
     transfer_payment(&ctx, amount)?;
     mint_release_token(&ctx, release_signer_bump)?;
 
-    msg!("proof: {:?}", proof);
-    msg!("account_leaf_indexes: {:?}", account_leaf_indexes);
-    deposit_to_orp(
-      &ctx,
-      &proof,
-      merkle_context,
-      merkle_tree_root_index,
-      account_leaf_indexes,
-      orp_config,
-      account_ids,
-      accounts,
-    )?;
     Ok(())
 }
 
@@ -183,51 +130,4 @@ fn mint_release_token(ctx: &Context<ReleasePurchase>, release_signer_bump: u8) -
     );
     
     mint_to(cpi_ctx_mint_to, 1)
-}
-
-fn deposit_to_orp<'c: 'info, 'info>(
-  ctx: &Context<'_, '_, 'c, 'info, ReleasePurchase<'info>>,
-  proof: &CompressedProof,
-  merkle_context: MerkleContext,
-  merkle_tree_root_index: u16,
-  account_leaf_indexes: Vec<u32>,
-  orp_config: OrpConfigInputParameter,
-  account_ids: Vec<[u8; 32]>,
-  accounts: Vec<OrpAccountInputParameter>,
-) -> Result<()> {
-    let cpi_accounts = Deposit {
-      signer: ctx.accounts.receiver.to_account_info(),
-      self_program: ctx.accounts.orp_program.to_account_info(),
-      cpi_authority_pda: ctx.accounts.orp_cpi_authority_pda.to_account_info(),
-      mint: ctx.accounts.payment_mint.to_account_info(),
-      pool: ctx.accounts.orp_pool.to_account_info(),
-      depositer_token_account: ctx.accounts.payment_token_account.to_account_info(),
-      treasury_token_account: ctx.accounts.treasury_token_account.to_account_info(),
-      token_program: ctx.accounts.token_program.to_account_info(),
-      light_system_program: ctx.accounts.light_system_program.to_account_info(),
-      system_program: ctx.accounts.system_program.to_account_info(),
-      account_compression_program: ctx.accounts.account_compression_program.to_account_info(),
-      registered_program_pda: ctx.accounts.registered_program_pda.to_account_info(),
-      noop_program: ctx.accounts.noop_program.to_account_info(),
-      account_compression_authority: ctx.accounts.account_compression_authority.to_account_info(),
-    };
-
-    let mut cpi_ctx = CpiContext::new(
-        ctx.accounts.orp_program.to_account_info(),
-        cpi_accounts,
-    );
-    cpi_ctx = cpi_ctx.with_remaining_accounts(ctx.remaining_accounts.to_vec());
-
-    const deposit_amount:u64 = 10000000;
-    deposit(
-      cpi_ctx,
-      *proof,
-      merkle_context,
-      merkle_tree_root_index,
-      account_leaf_indexes,
-      orp_config,
-      account_ids,
-      accounts,
-      deposit_amount,
-    )
 }

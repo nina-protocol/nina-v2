@@ -1,4 +1,6 @@
 [toolchain]
+anchor_version = "0.31.0"
+solana_version = "2.1.0"
 
 [features]
 seeds = false
@@ -6,7 +8,6 @@ skip-lint = false
 
 [programs.localnet]
 nina_v2 = "BmdryooV1qzhH3auE8xSzxTD97A83i5Xqxw1viRP73rv"
-orp = "FUnmsBnsTDEsa5zTcUJixVzwPZZwXNNfmp5ECr2acbYd"
 
 [registry]
 url = "https://api.apr.dev"
@@ -16,5 +17,5 @@ cluster = "Localnet"
 wallet = "/Users/michaelpollard/.config/solana/id.json"
 
 [scripts]
-test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/index.ts"
 build = "anchor build && mv ./target/idl/nina_v2.json ./target/idl/nina_v_2.json" 

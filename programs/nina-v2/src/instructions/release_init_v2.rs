@@ -27,7 +27,6 @@ use spl_pod::optional_keys::OptionalNonZeroPubkey;
 
 use crate::{
   get_meta_list_size,
-  get_mint_extensible_extension_data,
   get_mint_extension_data,
   update_account_lamports_to_minimum_balance,
   META_LIST_ACCOUNT_SEED,
@@ -100,7 +99,7 @@ pub fn handler (
     release_signer_bump: u8,
 ) -> Result <()> {
     let cpi_accounts = TokenMetadataInitialize {
-        token_program_id: ctx.accounts.token_2022_program.to_account_info(),
+        program_id: ctx.accounts.token_2022_program.to_account_info(),
         mint: ctx.accounts.mint.to_account_info(),
         metadata: ctx.accounts.mint.to_account_info(), // metadata account is the mint, since data is stored in mint
         mint_authority: ctx.accounts.release_signer.to_account_info(),
