@@ -39,4 +39,24 @@ pub mod nina_v2 {
             release_signer_bump,
         )
     }
+
+    pub fn release_init_and_purchase<'c: 'info, 'info>(
+        ctx: Context<'_, '_, 'c, 'info, ReleaseInitAndPurchase<'info>>,
+        release_signer_bump: u8,
+        uri: String,
+        name: String,
+        symbol: String,
+        total_supply: u64,
+        price: u64,
+    ) -> Result<()> {
+        instructions::release_init_and_purchase::handler(
+            ctx,
+            release_signer_bump,
+            uri,
+            name,
+            symbol,
+            total_supply,
+            price,
+        )
+    }
 }

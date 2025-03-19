@@ -84,56 +84,95 @@ pub fn handler<'c: 'info, 'info>(
     amount: u64,
     release_signer_bump: u8,
 ) -> Result<()> {
-
-    validate_purchase(&ctx, amount)?;
-    transfer_payment(&ctx, amount)?;
-    transfer_crs(&ctx, amount)?;
-    mint_release_token(&ctx, release_signer_bump)?;
+    validate_purchase(&ctx.accounts.release, &ctx.accounts.mint, amount)?;
+    
+    transfer_payment(
+        &ctx.accounts.payment_token_account,
+        &ctx.accounts.royalty_token_account,
+        &ctx.accounts.receiver,
+        &ctx.accounts.token_program,
+        amount,
+    )?;
+    
+    transfer_crs(
+        &ctx.accounts.payment_token_account,
+        &ctx.accounts.crs_token_account,
+        &ctx.accounts.receiver,
+        &ctx.accounts.token_program,
+        amount,
+    )?;
+    
+    mint_release_token(
+        &ctx.accounts.mint,
+        &ctx.accounts.receiver_release_token_account,
+        &ctx.accounts.release_signer,
+        &ctx.accounts.release,
+        &ctx.accounts.token_2022_program,
+        release_signer_bump,
+    )?;
+    
     Ok(())
 }
 
-fn validate_purchase(ctx: &Context<ReleasePurchase>, amount: u64) -> Result<()> {
-    if amount != ctx.accounts.release.price {
+pub fn validate_purchase<'info>(
+    release: &Account<'info, ReleaseV2>,
+    mint: &InterfaceAccount<'info, Mint>,
+    amount: u64,
+) -> Result<()> {
+    if amount != release.price {
         return Err(error!(NinaError::ReleasePurchaseWrongAmount));
     }
 
-    if ctx.accounts.mint.supply >= ctx.accounts.release.total_supply {
+    if mint.supply >= release.total_supply {
         return Err(error!(NinaError::ReleasePurchaseSoldOut));
     }
 
     Ok(())
 }
 
-fn transfer_payment(ctx: &Context<ReleasePurchase>, amount: u64) -> Result<()> {
+pub fn transfer_payment<'info>(
+    payment_token_account: &InterfaceAccount<'info, TokenAccount>,
+    royalty_token_account: &InterfaceAccount<'info, TokenAccount>,
+    receiver: &UncheckedAccount<'info>,
+    token_program: &Program<'info, Token>,
+    amount: u64,
+) -> Result<()> {
     let cpi_accounts = Transfer {
-        from: ctx.accounts.payment_token_account.to_account_info(),
-        to: ctx.accounts.royalty_token_account.to_account_info(),
-        authority: ctx.accounts.receiver.to_account_info(),
+        from: payment_token_account.to_account_info(),
+        to: royalty_token_account.to_account_info(),
+        authority: receiver.to_account_info(),
     };
     
     let cpi_ctx_transfer = CpiContext::new(
-        ctx.accounts.token_program.to_account_info(), 
+        token_program.to_account_info(), 
         cpi_accounts
     );
     
     anchor_spl::token::transfer(cpi_ctx_transfer, amount)
 }
 
-fn mint_release_token(ctx: &Context<ReleasePurchase>, release_signer_bump: u8) -> Result<()> {
+pub fn mint_release_token<'info>(
+    mint: &InterfaceAccount<'info, Mint>,
+    receiver_release_token_account: &InterfaceAccount<'info, TokenAccount>,
+    release_signer: &UncheckedAccount<'info>,
+    release: &Account<'info, ReleaseV2>,
+    token_2022_program: &Program<'info, Token2022>,
+    release_signer_bump: u8,
+) -> Result<()> {
     let cpi_accounts_mint_to = MintTo {
-        mint: ctx.accounts.mint.to_account_info(),
-        to: ctx.accounts.receiver_release_token_account.to_account_info(),
-        authority: ctx.accounts.release_signer.to_account_info(),
+        mint: mint.to_account_info(),
+        to: receiver_release_token_account.to_account_info(),
+        authority: release_signer.to_account_info(),
     };
 
     let seeds = &[
-        ctx.accounts.release.to_account_info().key.as_ref(),
+        release.to_account_info().key.as_ref(),
         &[release_signer_bump],
     ];
     let signer = &[&seeds[..]];
     
     let cpi_ctx_mint_to = CpiContext::new_with_signer(
-        ctx.accounts.token_2022_program.to_account_info(),
+        token_2022_program.to_account_info(),
         cpi_accounts_mint_to,
         signer
     );
@@ -141,7 +180,13 @@ fn mint_release_token(ctx: &Context<ReleasePurchase>, release_signer_bump: u8) -
     mint_to(cpi_ctx_mint_to, 1)
 }
 
-fn transfer_crs(ctx: &Context<ReleasePurchase>, amount: u64) -> Result<()> {
+pub fn transfer_crs<'info>(
+    payment_token_account: &InterfaceAccount<'info, TokenAccount>,
+    crs_token_account: &InterfaceAccount<'info, TokenAccount>,
+    receiver: &UncheckedAccount<'info>,
+    token_program: &Program<'info, Token>,
+    amount: u64,
+) -> Result<()> {
     let mut crs_amount = ONE_USDC;
     if amount > ONE_USDC {
         crs_amount = amount
@@ -152,13 +197,13 @@ fn transfer_crs(ctx: &Context<ReleasePurchase>, amount: u64) -> Result<()> {
     }
 
     let cpi_accounts = Transfer {
-        from: ctx.accounts.payment_token_account.to_account_info(),
-        to: ctx.accounts.crs_token_account.to_account_info(),
-        authority: ctx.accounts.receiver.to_account_info(),
+        from: payment_token_account.to_account_info(),
+        to: crs_token_account.to_account_info(),
+        authority: receiver.to_account_info(),
     };
 
     let cpi_ctx_transfer = CpiContext::new(
-        ctx.accounts.token_program.to_account_info(), 
+        token_program.to_account_info(), 
         cpi_accounts
     );
     
