@@ -12,6 +12,7 @@ import {
   createAssociatedTokenAccountInstruction,
   getAssociatedTokenAddress,
   getAccount,
+  getTokenMetadata,
 } from "@solana/spl-token";
 import {
   ComputeBudgetProgram,
@@ -570,6 +571,60 @@ describe("nina-v2", () => {
 
     const royaltyTokenBalance = await lightConnection.getTokenAccountBalance(royaltyTokenAccount, 'confirmed');
     expect(Number(royaltyTokenBalance.value.amount)).to.equal(Number(royaltyTokenBalanceBefore === 0 ? 0 : royaltyTokenBalanceBefore.value.amount) + RELEASE_PRICE);
+  });
+
+  it("Update Metadata", async () => {
+    const [release] = await anchor.web3.PublicKey.findProgramAddress(
+      [
+        Buffer.from(anchor.utils.bytes.utf8.encode("nina-release")),
+        mint3.publicKey.toBuffer(),
+      ],
+      program.programId
+    );
+    const [releaseSigner, releaseSignerBump] =
+      anchor.web3.PublicKey.findProgramAddressSync(
+        [release.toBuffer()],
+        program.programId
+      );
+    const ix = await program.methods
+      .releaseUpdateMetadata(
+        `https://arweave.net/ZIdtfNs7XKWlIz3_n1CnfYhKNHlWgnHyM7SfNXrZ1aQ`,
+        releaseSignerBump,
+      )
+      .accountsStrict({
+        payer: artist.publicKey,
+        authority: artist.publicKey,
+        release,
+        releaseSigner,
+        mint: mint3.publicKey,
+        systemProgram: anchor.web3.SystemProgram.programId,
+        token2022Program: TOKEN_2022_PROGRAM_ID,
+      })
+      .instruction();
+    const txid = await buildSignAndSendTransaction(
+      [modifyComputeUnits, addPriorityFee, ix],
+      artist,
+      lightConnection,
+      [],
+    );
+
+    if (txid) {
+      const latestBlockHash = await lightConnection.getLatestBlockhash();
+      await lightConnection.confirmTransaction(
+        {
+          blockhash: latestBlockHash.blockhash,
+          lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
+          signature: txid,
+        },
+        'finalized',
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    console.log("txid", txid);
+
+    const metadata = await getTokenMetadata(lightConnection, mint3.publicKey, 'confirmed');
+    console.log("metadata", metadata);
+    expect(metadata.uri).to.equal(`https://arweave.net/ZIdtfNs7XKWlIz3_n1CnfYhKNHlWgnHyM7SfNXrZ1aQ`);
   });
 });
 

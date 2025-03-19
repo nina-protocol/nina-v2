@@ -59,4 +59,12 @@ pub mod nina_v2 {
             price,
         )
     }
+
+    pub fn release_update_metadata<'c: 'info, 'info>(
+        ctx: Context<'_, '_, 'c, 'info, ReleaseUpdateMetadata<'info>>,
+        uri: String,
+        release_signer_bump: u8,
+    ) -> Result<()> {
+        instructions::release_update_metadata::handler(ctx, uri, release_signer_bump)
+    }
 }
