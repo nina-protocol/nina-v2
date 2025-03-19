@@ -589,6 +589,8 @@ describe("nina-v2", () => {
     const ix = await program.methods
       .releaseUpdateMetadata(
         `https://arweave.net/ZIdtfNs7XKWlIz3_n1CnfYhKNHlWgnHyM7SfNXrZ1aQ`,
+        "Nina Test2",
+        "NINA2",  
         releaseSignerBump,
       )
       .accountsStrict({
@@ -625,6 +627,8 @@ describe("nina-v2", () => {
     const metadata = await getTokenMetadata(lightConnection, mint3.publicKey, 'confirmed');
     console.log("metadata", metadata);
     expect(metadata.uri).to.equal(`https://arweave.net/ZIdtfNs7XKWlIz3_n1CnfYhKNHlWgnHyM7SfNXrZ1aQ`);
+    expect(metadata.name).to.equal("Nina Test2");
+    expect(metadata.symbol).to.equal("NINA2");
   });
 });
 

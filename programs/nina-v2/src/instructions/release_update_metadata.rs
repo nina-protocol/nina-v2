@@ -13,10 +13,12 @@ use anchor_spl::{
 };
 
 use crate::state::ReleaseV2;
-
+use crate::instructions::release_init_v2::update_mint_balance;
 #[derive(Accounts)]
 #[instruction(
   uri: String,
+  name: String,
+  symbol: String,
   release_signer_bump: u8,
 )]
 pub struct ReleaseUpdateMetadata<'info> {
@@ -49,9 +51,23 @@ pub struct ReleaseUpdateMetadata<'info> {
 pub fn handler(
   ctx: Context<ReleaseUpdateMetadata>,
   uri: String,
+  name: String,
+  symbol: String,
   release_signer_bump: u8,
 ) -> Result<()> {
-    let cpi_accounts = TokenMetadataUpdateField {
+    let cpi_accounts_uri = TokenMetadataUpdateField {
+        program_id: ctx.accounts.token_2022_program.to_account_info(),
+        metadata: ctx.accounts.mint.to_account_info(),
+        update_authority: ctx.accounts.release_signer.to_account_info(),
+    };
+
+    let cpi_accounts_name = TokenMetadataUpdateField {
+        program_id: ctx.accounts.token_2022_program.to_account_info(),
+        metadata: ctx.accounts.mint.to_account_info(),
+        update_authority: ctx.accounts.release_signer.to_account_info(),
+    };
+
+    let cpi_accounts_symbol = TokenMetadataUpdateField {
         program_id: ctx.accounts.token_2022_program.to_account_info(),
         metadata: ctx.accounts.mint.to_account_info(),
         update_authority: ctx.accounts.release_signer.to_account_info(),
@@ -63,14 +79,35 @@ pub fn handler(
     ];
     let signer = &[&seeds[..]];
     
-    let cpi_ctx = CpiContext::new_with_signer(
+    let cpi_ctx_uri = CpiContext::new_with_signer(
         ctx.accounts.token_2022_program.to_account_info(),
-        cpi_accounts,
+        cpi_accounts_uri,
         signer,
     );
 
-    let field = Field::Uri;
-    token_metadata_update_field(cpi_ctx, field, uri)?;
+    let cpi_ctx_name = CpiContext::new_with_signer(
+        ctx.accounts.token_2022_program.to_account_info(),
+        cpi_accounts_name,
+        signer,
+    );
+
+    let cpi_ctx_symbol = CpiContext::new_with_signer(
+        ctx.accounts.token_2022_program.to_account_info(),
+        cpi_accounts_symbol,
+        signer,
+    );
+
+    token_metadata_update_field(cpi_ctx_uri, Field::Uri, uri)?;
+    token_metadata_update_field(cpi_ctx_name, Field::Name, name)?;
+    token_metadata_update_field(cpi_ctx_symbol, Field::Symbol, symbol)?;
+
+    ctx.accounts.mint.reload()?;
+    
+    update_mint_balance(
+        &ctx.accounts.mint,
+        &ctx.accounts.payer,
+        &ctx.accounts.system_program,
+    )?;
 
     Ok(())
 }

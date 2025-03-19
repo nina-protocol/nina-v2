@@ -63,8 +63,10 @@ pub mod nina_v2 {
     pub fn release_update_metadata<'c: 'info, 'info>(
         ctx: Context<'_, '_, 'c, 'info, ReleaseUpdateMetadata<'info>>,
         uri: String,
+        name: String,
+        symbol: String,
         release_signer_bump: u8,
     ) -> Result<()> {
-        instructions::release_update_metadata::handler(ctx, uri, release_signer_bump)
+        instructions::release_update_metadata::handler(ctx, uri, name, symbol, release_signer_bump)
     }
 }
