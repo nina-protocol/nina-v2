@@ -284,14 +284,12 @@ describe("nina-v2", () => {
     await new Promise((resolve) => setTimeout(resolve, 1000));
     console.log("txid", txid);
 
-    const crsBalance = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
-    console.log("crsBalance", crsBalance);
+    // const crsBalance = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
 
     const purchaserTokenBalance = await lightConnection.getTokenAccountBalance(purchaserAta, 'confirmed');
     const royaltyTokenBalance = await lightConnection.getTokenAccountBalance(royaltyTokenAccount, 'confirmed');
-    console.log("purchaserTokenBalance", purchaserTokenBalance);
-    expect(Number(purchaserTokenBalance.value.amount)).to.equal(Number(purchaserTokenBalanceBefore.value.amount) - (RELEASE_PRICE * 2));
-    expect(Number(crsBalance.value.amount)).to.equal(RELEASE_PRICE);
+    expect(Number(purchaserTokenBalance.value.amount)).to.equal(Number(purchaserTokenBalanceBefore.value.amount) - (RELEASE_PRICE));
+    // expect(Number(crsBalance.value.amount)).to.equal(RELEASE_PRICE);
     expect(Number(royaltyTokenBalance.value.amount)).to.equal(RELEASE_PRICE);
   });
 
@@ -335,7 +333,7 @@ describe("nina-v2", () => {
   it("Purchase a Release", async () => {
     await new Promise((resolve) => setTimeout(resolve, 5000));
     const purchaserTokenBalanceBefore = await lightConnection.getTokenAccountBalance(purchaserAta, 'finalized');
-    const crsBalanceBefore = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'finalized');
+    // const crsBalanceBefore = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'finalized');
     const royaltyTokenBalanceBefore = await lightConnection.getTokenAccountBalance(royaltyTokenAccount, 'finalized');
 
     const [release] = await anchor.web3.PublicKey.findProgramAddress(
@@ -366,7 +364,7 @@ describe("nina-v2", () => {
           owner: purchaser.publicKey,
           tokenProgramId: TOKEN_2022_PROGRAM_ID,
         }),
-        crsTokenAccount,
+        // crsTokenAccount,
         systemProgram: anchor.web3.SystemProgram.programId,
         associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
         tokenProgram: TOKEN_PROGRAM_ID,
@@ -393,7 +391,7 @@ describe("nina-v2", () => {
           owner: purchaser.publicKey,
           tokenProgramId: TOKEN_2022_PROGRAM_ID,
         }),
-        crsTokenAccount,
+        // crsTokenAccount,
         systemProgram: anchor.web3.SystemProgram.programId,
         associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
         tokenProgram: TOKEN_PROGRAM_ID,
@@ -424,12 +422,12 @@ describe("nina-v2", () => {
     await new Promise((resolve) => setTimeout(resolve, 5000));
     console.log("txid", txid);
 
-    const crsBalance = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
-    console.log("crsBalance", crsBalance);
-    expect(Number(crsBalance.value.amount)).to.equal(Number(crsBalanceBefore.value.amount) + (RELEASE_PRICE * 2));
+    // const crsBalance = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
+    // console.log("crsBalance", crsBalance);
+    // expect(Number(crsBalance.value.amount)).to.equal(Number(crsBalanceBefore.value.amount) + (RELEASE_PRICE * 2));
 
     const purchaserTokenBalance = await lightConnection.getTokenAccountBalance(purchaserAta, 'confirmed');
-    expect(Number(purchaserTokenBalance.value.amount)).to.equal(Number(purchaserTokenBalanceBefore.value.amount) - (RELEASE_PRICE * 22));
+    expect(Number(purchaserTokenBalance.value.amount)).to.equal(Number(purchaserTokenBalanceBefore.value.amount) - (RELEASE_PRICE * 20));
 
     const royaltyTokenBalance = await lightConnection.getTokenAccountBalance(royaltyTokenAccount, 'confirmed');
     expect(Number(royaltyTokenBalance.value.amount)).to.equal(Number(royaltyTokenBalanceBefore.value.amount) + (RELEASE_PRICE * 20));
@@ -438,8 +436,7 @@ describe("nina-v2", () => {
   it("Initialize A Release and Purchase", async () => {
     await new Promise((resolve) => setTimeout(resolve, 5000));
     const purchaserTokenBalanceBefore = await lightConnection.getTokenAccountBalance(purchaserAta, 'confirmed');
-    const crsBalanceBefore = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
-    console.log('crsBalanceBefore', crsBalanceBefore)
+    // const crsBalanceBefore = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
     const royaltyTokenBalanceBefore = royaltyTokenAccount ? await lightConnection.getTokenAccountBalance(royaltyTokenAccount, 'confirmed') : 0;
 
     const [release] = await anchor.web3.PublicKey.findProgramAddress(
@@ -502,7 +499,7 @@ describe("nina-v2", () => {
         owner: purchaser.publicKey,
         tokenProgramId: TOKEN_PROGRAM_ID,
       }),
-      crsTokenAccount,
+      // crsTokenAccount,
       systemProgram: anchor.web3.SystemProgram.programId,
       associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
       tokenProgram: TOKEN_PROGRAM_ID,
@@ -562,12 +559,12 @@ describe("nina-v2", () => {
     await new Promise((resolve) => setTimeout(resolve, 1000));
     console.log("txid", txid);
 
-    const crsBalance = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
-    console.log("crsBalance", crsBalance);
-    expect(Number(crsBalance.value.amount)).to.equal(Number(crsBalanceBefore.value.amount) + RELEASE_PRICE);
+    // const crsBalance = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
+    // console.log("crsBalance", crsBalance);
+    // expect(Number(crsBalance.value.amount)).to.equal(Number(crsBalanceBefore.value.amount) + RELEASE_PRICE);
 
     const purchaserTokenBalance = await lightConnection.getTokenAccountBalance(purchaserAta, 'confirmed');
-    expect(Number(purchaserTokenBalance.value.amount)).to.equal(Number(purchaserTokenBalanceBefore.value.amount) - (RELEASE_PRICE * 2));
+    expect(Number(purchaserTokenBalance.value.amount)).to.equal(Number(purchaserTokenBalanceBefore.value.amount) - (RELEASE_PRICE));
 
     const royaltyTokenBalance = await lightConnection.getTokenAccountBalance(royaltyTokenAccount, 'confirmed');
     expect(Number(royaltyTokenBalance.value.amount)).to.equal(Number(royaltyTokenBalanceBefore === 0 ? 0 : royaltyTokenBalanceBefore.value.amount) + RELEASE_PRICE);

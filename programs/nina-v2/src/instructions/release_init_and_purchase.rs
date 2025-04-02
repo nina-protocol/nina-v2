@@ -79,11 +79,11 @@ pub struct ReleaseInitAndPurchase<'info> {
     )]
     pub receiver_release_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
     ///TODO: CHECK THAT ADDRESS === EXPECTED CRS ADDRESS
-    #[account(
-      mut,
-      constraint = crs_token_account.mint == payment_mint.key(),
-    )]
-    pub crs_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
+    // #[account(
+    //   mut,
+    //   constraint = crs_token_account.mint == payment_mint.key(),
+    // )]
+    // pub crs_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
     pub system_program: Program<'info, System>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub token_program: Program<'info, Token>,
@@ -143,13 +143,13 @@ pub fn handler(
         price,
     )?;
 
-    transfer_crs(
-        &ctx.accounts.payment_token_account,
-        &ctx.accounts.crs_token_account,
-        &ctx.accounts.receiver,
-        &ctx.accounts.token_program,
-        price,
-    )?;
+    // transfer_crs(
+    //     &ctx.accounts.payment_token_account,
+    //     &ctx.accounts.crs_token_account,
+    //     &ctx.accounts.receiver,
+    //     &ctx.accounts.token_program,
+    //     price,
+    // )?;
 
     mint_release_token(
         &ctx.accounts.mint,
