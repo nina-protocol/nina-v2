@@ -587,11 +587,13 @@ describe("nina-v2", () => {
         program.programId
       );
     const ix = await program.methods
-      .releaseUpdateMetadata(
+      .releaseUpdate(
         `https://arweave.net/ZIdtfNs7XKWlIz3_n1CnfYhKNHlWgnHyM7SfNXrZ1aQ`,
         "Nina Test2",
         "NINA2",  
         releaseSignerBump,
+        new anchor.BN(RELEASE_PRICE * 5),
+        new anchor.BN(1000),
       )
       .accountsStrict({
         payer: artist.publicKey,
@@ -629,6 +631,10 @@ describe("nina-v2", () => {
     expect(metadata.uri).to.equal(`https://arweave.net/ZIdtfNs7XKWlIz3_n1CnfYhKNHlWgnHyM7SfNXrZ1aQ`);
     expect(metadata.name).to.equal("Nina Test2");
     expect(metadata.symbol).to.equal("NINA2");
+
+    const releaseData = await program.account.releaseV2.fetch(release);
+    expect(Number(releaseData.price)).to.equal(RELEASE_PRICE * 5);
+    expect(Number(releaseData.totalSupply)).to.equal(1000);
   });
 });
 

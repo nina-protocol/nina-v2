@@ -20,8 +20,10 @@ use crate::instructions::release_init_v2::update_mint_balance;
   name: String,
   symbol: String,
   release_signer_bump: u8,
+  price: u64,
+  total_supply: u64,
 )]
-pub struct ReleaseUpdateMetadata<'info> {
+pub struct ReleaseUpdate<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     #[account(
@@ -35,6 +37,7 @@ pub struct ReleaseUpdateMetadata<'info> {
     )]
     pub release_signer: UncheckedAccount<'info>,
     #[account(
+      mut,
       seeds = [b"nina-release", mint.key().as_ref()],
       bump,
     )]
@@ -49,11 +52,13 @@ pub struct ReleaseUpdateMetadata<'info> {
 }
 
 pub fn handler(
-  ctx: Context<ReleaseUpdateMetadata>,
+  ctx: Context<ReleaseUpdate>,
   uri: String,
   name: String,
   symbol: String,
   release_signer_bump: u8,
+  price: u64,
+  total_supply: u64,
 ) -> Result<()> {
     let cpi_accounts_uri = TokenMetadataUpdateField {
         program_id: ctx.accounts.token_2022_program.to_account_info(),
@@ -108,6 +113,9 @@ pub fn handler(
         &ctx.accounts.payer,
         &ctx.accounts.system_program,
     )?;
+
+    ctx.accounts.release.price = price;
+    ctx.accounts.release.total_supply = total_supply;
 
     Ok(())
 }
