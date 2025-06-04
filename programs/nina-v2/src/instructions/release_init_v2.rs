@@ -33,6 +33,8 @@ use crate::{
 };
 
 use crate::state::ReleaseV2;
+use crate::utils::file_service_account_key;
+use crate::errors::NinaError;
 
 #[derive(AnchorDeserialize, AnchorSerialize)]
 pub struct ReleaseInitV2Args {
@@ -161,6 +163,13 @@ pub fn handler(
     price: u64,
     release_signer_bump: u8,
 ) -> Result<()> {
+    if ctx.accounts.payer.key() != ctx.accounts.authority.key() {
+        #[cfg(feature = "is-test")]
+        if ctx.accounts.payer.key() != file_service_account_key() {
+            return Err(error!(NinaError::DelegatedPayerMismatch));
+        }
+    }
+
     initialize_token_metadata(
         &ctx.accounts.token_2022_program,
         &ctx.accounts.mint,

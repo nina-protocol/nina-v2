@@ -13,7 +13,8 @@ use anchor_spl::{
 use crate::state::ReleaseV2;
 use crate::instructions::release_init_v2::{set_release_data, initialize_token_metadata, update_mint_balance};
 use crate::instructions::release_purchase::{validate_purchase, transfer_payment, transfer_crs, mint_release_token};
-
+use crate::utils::file_service_account_key;
+use crate::errors::NinaError;
 #[derive(Accounts)]
 #[instruction(
   release_signer_bump: u8,
@@ -99,6 +100,14 @@ pub fn handler(
     total_supply: u64,
     price: u64,
 ) -> Result<()> {
+
+    if ctx.accounts.payer.key() != ctx.accounts.authority.key() {
+        #[cfg(feature = "is-test")]
+        if ctx.accounts.payer.key() != file_service_account_key() {
+            return Err(error!(NinaError::DelegatedPayerMismatch));
+        }
+    }
+
     initialize_token_metadata(
         &ctx.accounts.token_2022_program,
         &ctx.accounts.mint,

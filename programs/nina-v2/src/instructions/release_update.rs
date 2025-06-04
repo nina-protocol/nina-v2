@@ -14,6 +14,8 @@ use anchor_spl::{
 
 use crate::state::ReleaseV2;
 use crate::instructions::release_init_v2::update_mint_balance;
+use crate::utils::file_service_account_key;
+use crate::errors::NinaError;
 #[derive(Accounts)]
 #[instruction(
   uri: String,
@@ -60,6 +62,15 @@ pub fn handler(
   price: u64,
   total_supply: u64,
 ) -> Result<()> {
+
+  if ctx.accounts.payer.key() != ctx.accounts.authority.key() {
+      
+      #[cfg(feature = "is-test")]
+      if ctx.accounts.payer.key() != file_service_account_key() {
+          return Err(error!(NinaError::DelegatedPayerMismatch));
+      }
+  }
+
     let cpi_accounts_uri = TokenMetadataUpdateField {
         program_id: ctx.accounts.token_2022_program.to_account_info(),
         metadata: ctx.accounts.mint.to_account_info(),

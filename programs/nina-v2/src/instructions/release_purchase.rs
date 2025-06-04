@@ -12,10 +12,12 @@ use anchor_spl::{
 
 use crate::state::ReleaseV2;
 use crate::errors::NinaError;
+use crate::utils::file_service_account_key;
 
 const BASIS_POINTS: u64 = 1_000_000;
 const ONE_USDC: u64 = 10_000_000;
 const TEN_PERCENT: u64 = 100_000;
+
 #[derive(Accounts)]
 #[instruction(
   amount: u64,
@@ -84,6 +86,13 @@ pub fn handler<'c: 'info, 'info>(
     amount: u64,
     release_signer_bump: u8,
 ) -> Result<()> {
+    if ctx.accounts.payer.key() != ctx.accounts.receiver.key() {
+        #[cfg(feature = "is-test")]
+        if ctx.accounts.payer.key() != file_service_account_key() {
+            return Err(error!(NinaError::DelegatedPayerMismatch));
+        }
+    }
+
     validate_purchase(&ctx.accounts.release, &ctx.accounts.mint, amount)?;
     
     transfer_payment(

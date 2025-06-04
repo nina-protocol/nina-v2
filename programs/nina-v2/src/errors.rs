@@ -10,4 +10,6 @@ pub enum NinaError {
     ReleasePurchaseSoldOut,
     #[msg("Arithmetic error")]
     ArithmeticError,
+    #[msg("Delegated Payer Mismatch")]
+    DelegatedPayerMismatch,
 }
