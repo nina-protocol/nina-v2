@@ -1,5 +1,5 @@
 use anchor_lang::{
-  prelude::Result,
+  prelude::*,
   solana_program::{
       account_info::AccountInfo,
       program::invoke,
@@ -12,11 +12,12 @@ use anchor_lang::{
 };
 use anchor_spl::token_interface::spl_token_2022::{
   extension::{BaseStateWithExtensions, Extension, StateWithExtensions},
-  solana_zk_token_sdk::zk_token_proof_instruction::Pod,
   state::Mint,
 };
+use solana_zk_token_sdk::zk_token_proof_instruction::Pod;
 use spl_tlv_account_resolution::{account::ExtraAccountMeta, state::ExtraAccountMetaList};
 use spl_type_length_value::variable_len_pack::VariableLenPack;
+use std::str::FromStr;
 
 pub const APPROVE_ACCOUNT_SEED: &[u8] = b"approve-account";
 pub const META_LIST_ACCOUNT_SEED: &[u8] = b"extra-account-metas";
@@ -34,15 +35,6 @@ pub fn update_account_lamports_to_minimum_balance<'info>(
       )?;
   }
   Ok(())
-}
-
-pub fn get_mint_extensible_extension_data<T: Extension + VariableLenPack>(
-  account: &mut AccountInfo,
-) -> Result<T> {
-  let mint_data = account.data.borrow();
-  let mint_with_extension = StateWithExtensions::<Mint>::unpack(&mint_data)?;
-  let extension_data = mint_with_extension.get_variable_len_extension::<T>()?;
-  Ok(extension_data)
 }
 
 pub fn get_mint_extension_data<T: Extension + Pod>(account: &mut AccountInfo) -> Result<T> {
@@ -68,4 +60,8 @@ pub fn get_meta_list(approve_account: Option<Pubkey>) -> Vec<ExtraAccountMeta> {
 pub fn get_meta_list_size(approve_account: Option<Pubkey>) -> usize {
   // safe because it's either 0 or 1
   ExtraAccountMetaList::size_of(get_meta_list(approve_account).len()).unwrap()
+}
+
+pub fn file_service_account_key() -> Pubkey {
+  Pubkey::from_str("HQUtBQzt8d5ZtxAwfbPLE6TpBq68wJQ7ZaSjQDEn4Hz6").unwrap()
 }
