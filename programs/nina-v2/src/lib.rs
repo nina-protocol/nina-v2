@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("BmdryooV1qzhH3auE8xSzxTD97A83i5Xqxw1viRP73rv");
+declare_id!("nina2DQvAA8Sa9rxG72swBcNNDYQxdWGojzwDk9yn2q");
 declare_program!(orp);
 
 use crate::orp::types::{
