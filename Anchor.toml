@@ -1,4 +1,6 @@
 [toolchain]
+anchor_version = "0.31.0"
+solana_version = "2.1.0"
 
 [features]
 seeds = false
@@ -21,5 +23,5 @@ cluster = "devnet"
 wallet = "/Users/michaelpollard/.config/solana/nina.json"
 
 [scripts]
-test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/index.ts"
 build = "anchor build && mv ./target/idl/nina_v2.json ./target/idl/nina_v_2.json" 

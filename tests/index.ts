@@ -3,9 +3,6 @@ import { Program } from "@coral-xyz/anchor";
 import { NinaV2 } from "../target/types/nina_v2";
 import { PublicKey, Keypair } from "@solana/web3.js";
 import { ASSOCIATED_PROGRAM_ID } from "@coral-xyz/anchor/dist/cjs/utils/token";
-import { assert, expect } from "chai";
-import fs from "fs";
-import path from "path";
 
 import {
   createAssociatedTokenAccount,
@@ -15,46 +12,26 @@ import {
   createAssociatedTokenAccountInstruction,
   getAssociatedTokenAddress,
   getAccount,
-  getAssociatedTokenAddressSync,
+  getTokenMetadata,
 } from "@solana/spl-token";
-import * as borsh from "borsh";
 import {
-  AddressLookupTableAccount,
   ComputeBudgetProgram,
 } from "@solana/web3.js";
 
 import {
-  LightSystemProgram,
-  NewAddressParams,
-  Rpc,
-  bn,
-  createRpc,
-  defaultStaticAccountsStruct,
-  defaultTestStateTreeAccounts,
-  deriveAddress,
-  createBN254,
-  hashToBn254FieldSizeBe,
-  packCompressedAccounts,
-  packNewAddressParams,
-  CompressedAccountWithMerkleContext,
-  airdropSol,
-} from "@lightprotocol/stateless.js";
-import { OrpAccountSchema, OrpConfigSchema } from "./helpers/schemas";
-import {
   buildSignAndSendTransaction,
-  formatRemainingAccounts,
-} from "./helpers/compression";
+} from "./helpers/index";
+import { expect } from "chai";
 
 const TOKEN_2022_PROGRAM_ID = new anchor.web3.PublicKey(
   "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
 );
 
 const program = anchor.workspace.NinaV2 as Program<NinaV2>;
-const lightConnection: Rpc = createRpc();
+const lightConnection = new anchor.web3.Connection('http://127.0.0.1:8899');
 
 const provider = new anchor.AnchorProvider(lightConnection, anchor.Wallet.local(), anchor.AnchorProvider.defaultOptions());
 anchor.setProvider(provider);
-console.log("lightConnection", lightConnection);
 let royaltyTokenAccount: PublicKey;
 const RELEASE_PRICE = 10000000;
 
@@ -69,210 +46,156 @@ const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({
 
 describe("nina-v2", () => {
 
+  const artist = Keypair.generate();
   const payer = Keypair.generate();
   const mint = Keypair.generate();
+  const mint2 = Keypair.generate();
+  const mint3 = Keypair.generate();
   const purchaser = Keypair.generate();
+  const paymentMint = Keypair.generate();
+  const ninaTreasury = Keypair.generate().publicKey;
   let purchaserAta: PublicKey;
+  let payerAta: PublicKey;
+  let ninaTreasuryAta: PublicKey;
+  let crsAccount = Keypair.generate();
+  let crsTokenAccount: PublicKey;
 
-  const orpTestAccounts = JSON.parse(
-    fs.readFileSync(
-      path.resolve(__dirname, "./helpers/orp-test-accounts.json"),
-      "utf8"
-    )
-  );
-  console.log("orpTestAccounts", orpTestAccounts);
-  console.log(
-    "orpTestAccounts.deployer._keypair.secretKey",
-    orpTestAccounts.deployer._keypair.secretKey.data
-  );
-  console.log(
-    "Object.values(orpTestAccounts.paymentMint._keypair.secretKey)",
-    Object.values(orpTestAccounts.paymentMint._keypair.secretKey)
-  );
-  console.log(
-    "Object.values(orpTestAccounts.deployer._keypair.secretKey)",
-    orpTestAccounts.deployer._keypair.secretKey.data
-  );
-  console.log(
-    "new Uint8Array(Object.values(orpTestAccounts.paymentMint._keypair.secretKey))",
-    new Uint8Array(
-      Object.values(orpTestAccounts.paymentMint._keypair.secretKey)
-    )
-  );
-  const paymentMint = Keypair.fromSecretKey(
-    new Uint8Array(
-      Object.values(orpTestAccounts.paymentMint._keypair.secretKey)
-    )
-  );
-  const orpDeployer = Keypair.fromSecretKey(
-    new Uint8Array(orpTestAccounts.deployer._keypair.secretKey.data)
-  );
-  let {
-    lookupTableAddress,
-    orpConfigAddress,
-    orpAccount1Address,
-    orpAccount2Address,
-    orpAccount3Address,
-    orpAccount4Address,
-    treasuryAddress,
-    orpProgramId,
-    orpPoolPublicKey,
-    cpiAuthorityPda,
-    merkleTree,
-    nullifierQueue,
-    addressTree,
-    addressQueue,
-  } = orpTestAccounts;
-
-  lookupTableAddress = new anchor.web3.PublicKey(lookupTableAddress);
-  orpAccount1Address = new anchor.web3.PublicKey(orpAccount1Address);
-  orpAccount2Address = new anchor.web3.PublicKey(orpAccount2Address);
-  orpAccount3Address = new anchor.web3.PublicKey(orpAccount3Address);
-  orpAccount4Address = new anchor.web3.PublicKey(orpAccount4Address);
-  orpPoolPublicKey = new anchor.web3.PublicKey(orpPoolPublicKey);
-  orpProgramId = new anchor.web3.PublicKey(orpProgramId);
-  orpConfigAddress = new anchor.web3.PublicKey(orpConfigAddress);
-  treasuryAddress = new anchor.web3.PublicKey(treasuryAddress);
-  cpiAuthorityPda = new anchor.web3.PublicKey(cpiAuthorityPda);
-  merkleTree = new anchor.web3.PublicKey(merkleTree);
-  nullifierQueue = new anchor.web3.PublicKey(nullifierQueue);
-  addressTree = new anchor.web3.PublicKey(addressTree);
-  addressQueue = new anchor.web3.PublicKey(addressQueue);
-
-
-  
-  const {
-    accountCompressionAuthority,
-    noopProgram,
-    registeredProgramPda,
-    accountCompressionProgram,
-  } = defaultStaticAccountsStruct();
-
-console.log('registeredProgramPda', registeredProgramPda)
-  it("airdrop payer", async () => {
+  it("setup accounts", async () => {
     console.log("before airdrop");
     const tx = await lightConnection
       .requestAirdrop(payer.publicKey, 10000000000)
       .catch((err) => console.log("err", err));
-    console.log("tx", tx);
-    let confirmed;
-    while (!confirmed && tx) {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      confirmed = await lightConnection.getSignatureStatuses([tx]);
-      if (!confirmed) continue;
-      if (confirmed.value[0].err) {
-        throw new Error(confirmed.value[0].err.toString());
-      }
-      if (confirmed.value[0].confirmationStatus === "confirmed") {
-        confirmed = true;
-        break;
-      }
+    if (!tx) {
+      throw new Error("Transaction failed");
     }
-
-    const balanceAfterAirdrop = await lightConnection.getBalance(
-      payer.publicKey
+    const latestBlockHash = await lightConnection.getLatestBlockhash();
+    const payerConfirmed = await lightConnection.confirmTransaction({
+      blockhash: latestBlockHash.blockhash,
+      lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
+      signature: tx,
+    },
+      'finalized',
     );
-    console.log("Balance after airdrop", balanceAfterAirdrop);
-  });
+    console.log('airdrop payer confirmed', payerConfirmed)
 
-  it("airdrop purchaser", async () => {
-    const tx = await lightConnection.requestAirdrop(
-      purchaser.publicKey,
+    const artistTx = await lightConnection.requestAirdrop(
+      artist.publicKey,
       10000000000
     );
-    console.log("tx", tx);
-    let confirmed;
-    while (!confirmed) {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      confirmed = await lightConnection.getSignatureStatuses([tx]);
-      if (!confirmed) continue;
-      if (confirmed.value[0].err) {
-        throw new Error(confirmed.value[0].err.toString());
-      }
-      if (confirmed.value[0].confirmationStatus === "confirmed") {
-        confirmed = true;
-        break;
-      }
+    if (!artistTx) {
+      throw new Error("artistTx Transaction failed");
     }
-
-    const balanceAfterAirdrop = await lightConnection.getBalance(
-      purchaser.publicKey
+    const latestBlockHashArtist = await lightConnection.getLatestBlockhash();
+    const artistConfirmed = await lightConnection.confirmTransaction({
+      blockhash: latestBlockHashArtist.blockhash,
+      lastValidBlockHeight: latestBlockHashArtist.lastValidBlockHeight,
+      signature: artistTx,
+    },
+      'finalized',
     );
-    console.log("Balance after airdrop", balanceAfterAirdrop);
-  });
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const payerBalanceAfterAirdrop = await lightConnection.getBalance(
+      payer.publicKey
+    );
+    console.log("payer Balance after airdrop", payerBalanceAfterAirdrop);
+    await createMint(
+      lightConnection,
+      payer,
+      payer.publicKey,
+      null,
+      7,
+      paymentMint,
+      {
+        skipPreflight: true,
+      },
+      TOKEN_PROGRAM_ID
+    );
 
-  it("create payment mint", async () => {
+    payerAta = await createAssociatedTokenAccount(
+      lightConnection,
+      payer,
+      paymentMint.publicKey,
+      payer.publicKey,
+    )
+    ninaTreasuryAta = await createAssociatedTokenAccount(
+      lightConnection,
+      payer,
+      paymentMint.publicKey,
+      ninaTreasury,
+    )
+
+    crsTokenAccount = await createAssociatedTokenAccount(
+      lightConnection,
+      payer,
+      paymentMint.publicKey,
+      crsAccount.publicKey,
+      null,
+      TOKEN_PROGRAM_ID,
+      ASSOCIATED_PROGRAM_ID
+    )
+
     purchaserAta = await createAssociatedTokenAccount(
       lightConnection,
-      purchaser,
+      payer,
       paymentMint.publicKey,
-      purchaser.publicKey
-    );
+      purchaser.publicKey,
+    )
 
     await mintTo(
       lightConnection,
-      purchaser,
+      payer,
+      paymentMint.publicKey,
+      payerAta,
+      payer.publicKey,
+      RELEASE_PRICE * 100
+    )
+
+    const purchaserTx = await lightConnection.requestAirdrop(
+      purchaser.publicKey,
+      10000000000
+    );
+    if (!purchaserTx) {
+      throw new Error("purchaserTx Transaction failed");
+    }
+    const latestBlockHash2 = await lightConnection.getLatestBlockhash();
+    const purchaserConfirmed = await lightConnection.confirmTransaction({
+      blockhash: latestBlockHash2.blockhash,
+      lastValidBlockHeight: latestBlockHash2.lastValidBlockHeight,
+      signature: purchaserTx,
+    },
+      'finalized',
+    );
+    const balanceAfterAirdrop = await lightConnection.getBalance(
+      purchaser.publicKey
+    );
+    console.log("Balance after airdrop", balanceAfterAirdrop);
+
+    await mintTo(
+      lightConnection,
+      payer,
       paymentMint.publicKey,
       purchaserAta,
-      orpDeployer,
-      RELEASE_PRICE * 10
-    );
+      payer.publicKey,
+      RELEASE_PRICE * 100
+    )
   });
-
-  it("extend lookup table", async () => {
-    const lookupTableAccount = (
-      await lightConnection.getAddressLookupTable(lookupTableAddress)
-    ).value;
-    console.log("lookupTableAccount", lookupTableAccount);
-    
-    const extendInstruction = anchor.web3.AddressLookupTableProgram.extendLookupTable({
-      payer: orpDeployer.publicKey,
-      authority: orpDeployer.publicKey,
-      lookupTable: lookupTableAddress,
-      addresses: [
-        program.programId,
-        ComputeBudgetProgram.programId,
-        orpAccount1Address,
-        orpAccount2Address,
-        orpAccount3Address,
-        orpAccount4Address,
-        orpConfigAddress,
-        TOKEN_2022_PROGRAM_ID,
-      ],
-    });
-
-    const { blockhash } = await lightConnection.getLatestBlockhash();
-
-    const messageV0 = new anchor.web3.TransactionMessage({
-      payerKey: orpDeployer.publicKey,
-      recentBlockhash: blockhash,
-      instructions: [modifyComputeUnits, addPriorityFee, extendInstruction],
-    }).compileToV0Message([lookupTableAccount])
-    console.log("messageV0", messageV0)
-    const tx = new anchor.web3.VersionedTransaction(messageV0)
-    console.log("tx", tx)
-    tx.sign([orpDeployer])
-    const txid = await lightConnection.sendRawTransaction(tx.serialize())
-
-    console.log("txid", txid);
-      
-  })
 
   it("Initialize A Release for publisher without paymentMint ATA", async () => {
     const balanceBefore = await lightConnection.getBalance(payer.publicKey);
     console.log("Balance before", balanceBefore);
 
-    const { release } = await buildAndSendReleaseInitV2Transaction(
+    const { release, txid } = await buildAndSendReleaseInitV2Transaction(
       program,
       payer,
+      artist,
       lightConnection,
       paymentMint,
       mint,
-      lookupTableAddress,
-      orpDeployer
+      undefined,
     );
 
     await new Promise((resolve) => setTimeout(resolve, 1000));
+    console.log('release', release)
     const releaseAccount = await program.account.releaseV2.fetch(release);
     console.log("Release", releaseAccount);
     const balanceAfter = await lightConnection.getBalance(
@@ -280,9 +203,25 @@ console.log('registeredProgramPda', registeredProgramPda)
       "confirmed"
     );
     console.log("Balance after", balanceAfter);
+
+    if (txid) {
+      const latestBlockHash = await lightConnection.getLatestBlockhash();
+      await lightConnection.confirmTransaction(
+        {
+          blockhash: latestBlockHash.blockhash,
+          lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
+          signature: txid,
+        },
+        'finalized',
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
   });
 
   it("Purchase a Release", async () => {
+    const purchaserTokenBalanceBefore = await lightConnection.getTokenAccountBalance(purchaserAta, 'confirmed');
+
     const [release] = await anchor.web3.PublicKey.findProgramAddress(
       [
         Buffer.from(anchor.utils.bytes.utf8.encode("nina-release")),
@@ -290,261 +229,16 @@ console.log('registeredProgramPda', registeredProgramPda)
       ],
       program.programId
     );
-
     const [releaseSigner, releaseSignerBump] =
       anchor.web3.PublicKey.findProgramAddressSync(
         [release.toBuffer()],
         program.programId
       );
-
-    console.log('orpConfigAddress', orpConfigAddress)
-    const orpConfigData = await lightConnection.getCompressedAccount(
-      bn(orpConfigAddress.toBytes())
-    );
-    const orpConfig: any = borsh.deserialize(
-      OrpConfigSchema,
-      orpConfigData.data.data
-    );
-
-    const orpAccount1Data = await lightConnection.getCompressedAccount(
-      bn(orpAccount1Address.toBytes())
-    );
-    console.log("orpAccount1Data", orpAccount1Data);
-    const orpAccount2Data = await lightConnection.getCompressedAccount(
-      bn(orpAccount2Address.toBytes())
-    );
-    console.log("orpAccount2Data", orpAccount2Data);
-    const orpAccount3Data = await lightConnection.getCompressedAccount(
-      bn(orpAccount3Address.toBytes())
-    );
-    console.log("orpAccount3Data", orpAccount3Data);
-    const orpAccount4Data = await lightConnection.getCompressedAccount(
-      bn(orpAccount4Address.toBytes())
-    );
-    console.log("orpAccount4Data", orpAccount4Data);
-
-    const orpAccount1: any = borsh.deserialize(
-      OrpAccountSchema,
-      orpAccount1Data.data.data
-    );
-    console.log("orpAccount1", orpAccount1);
-    const orpAccount2: any = borsh.deserialize(
-      OrpAccountSchema,
-      orpAccount2Data.data.data
-    );
-    console.log("orpAccount2", orpAccount2);
-    const orpAccount3: any = borsh.deserialize(
-      OrpAccountSchema,
-      orpAccount3Data.data.data
-    );
-    console.log("orpAccount3", orpAccount3);
-    const orpAccount4: any = borsh.deserialize(
-      OrpAccountSchema,
-      orpAccount4Data.data.data
-    );
-    console.log("orpAccount4", orpAccount4);
-    const orpAccountProof = await lightConnection.getValidityProofV0([
-      {
-        hash: bn(Uint8Array.from(orpAccount1Data.hash)),
-        tree: addressTree,
-        queue: addressQueue,
-      },
-      {
-        hash: bn(Uint8Array.from(orpAccount2Data.hash)),
-        tree: addressTree,
-        queue: addressQueue,
-      },
-      {
-        hash: bn(Uint8Array.from(orpAccount3Data.hash)),
-        tree: addressTree,
-        queue: addressQueue,
-      },
-      {
-        hash: bn(Uint8Array.from(orpAccount4Data.hash)),
-        tree: addressTree,
-        queue: addressQueue,
-      },
-    ]);
-    console.log('orpAccount1Data.hash', orpAccount1Data.hash)
-    console.log('orpAccount2Data.hash', orpAccount2Data.hash)
-    console.log('orpAccount3Data.hash', orpAccount3Data.hash)
-    console.log('orpAccount4Data.hash', orpAccount4Data.hash)
-    console.log("orpAccountProof", orpAccountProof);
-    const inputCompressedAccount1: CompressedAccountWithMerkleContext = {
-      merkleTree,
-      nullifierQueue,
-      hash: orpAccount1Data.hash,
-      leafIndex: orpAccount1Data.leafIndex,
-      readOnly: false,
-      owner: orpAccount1Data.owner,
-      lamports: orpAccount1Data.lamports,
-      address: orpAccount1Data.address,
-      data: orpAccount1Data.data,
-    };
-    const inputCompressedAccount2: CompressedAccountWithMerkleContext = {
-      merkleTree,
-      nullifierQueue,
-      hash: orpAccount2Data.hash,
-      leafIndex: orpAccount2Data.leafIndex,
-      readOnly: false,
-      owner: orpAccount2Data.owner,
-      lamports: orpAccount2Data.lamports,
-      address: orpAccount2Data.address,
-      data: orpAccount2Data.data,
-    };
-    const inputCompressedAccount3: CompressedAccountWithMerkleContext = {
-      merkleTree,
-      nullifierQueue,
-      hash: orpAccount3Data.hash,
-      leafIndex: orpAccount3Data.leafIndex,
-      readOnly: false,
-      owner: orpAccount3Data.owner,
-      lamports: orpAccount3Data.lamports,
-      address: orpAccount3Data.address,
-      data: orpAccount3Data.data,
-    };
-
-    const inputCompressedAccount4: CompressedAccountWithMerkleContext = {
-      merkleTree,
-      nullifierQueue,
-      hash: orpAccount4Data.hash,
-      leafIndex: orpAccount4Data.leafIndex,
-      readOnly: false,
-      owner: orpAccount4Data.owner,
-      lamports: orpAccount4Data.lamports,
-      address: orpAccount4Data.address,
-      data: orpAccount4Data.data,
-    };
-
-    const { packedInputCompressedAccounts, remainingAccounts } =
-      packCompressedAccounts(
-        [
-          inputCompressedAccount1,
-          inputCompressedAccount2,
-          inputCompressedAccount3,
-          inputCompressedAccount4,
-        ],
-        orpAccountProof.rootIndices,
-        []
-      );
-    console.log("packedInputCompressedAccounts", packedInputCompressedAccounts);
-    packedInputCompressedAccounts.forEach(account => {
-      console.log('account address', new Uint8Array(account.compressedAccount.address))
-      console.log('account data', account.compressedAccount.data)
-    })
-    orpAccountProof.roots.forEach(root => {
-      console.log('root', new Uint8Array(root.toArray()))
-    })
-    orpAccountProof.leaves.forEach(leaf => {
-      console.log('leaf', new Uint8Array(leaf.toArray()))
-    })
-    //   console.log(        new anchor.BN(RELEASE_PRICE),
-  //   releaseSignerBump,
-  //   orpAccountProof.compressedProof,
-  //   {
-  //     merkleTreePubkeyIndex:
-  //       packedInputCompressedAccounts[0].merkleContext
-  //         .merkleTreePubkeyIndex,
-  //     nullifierQueuePubkeyIndex:
-  //       packedInputCompressedAccounts[0].merkleContext
-  //         .nullifierQueuePubkeyIndex,
-  //   },
-  //   packedInputCompressedAccounts[0].rootIndex,
-  //   [
-  //     orpAccount1Data.leafIndex,
-  //     orpAccount2Data.leafIndex,
-  //     orpAccount3Data.leafIndex,
-  //     orpAccount4Data.leafIndex,
-  //   ],
-  //   {
-  //     address: Array.from(orpConfigAddress.toBytes()),
-  //     authority: Array.from(orpConfig.authority),
-  //     pool: Array.from(orpConfig.pool),
-  //     firstMinterPercent: bn(orpConfig.first_minter_percent),
-  //     inviteReferralPercent: bn(orpConfig.invite_referral_percent),
-  //     purchaseReferralPercent: bn(orpConfig.purchase_referral_percent),
-  //     topSupportersPercent: bn(orpConfig.top_supporters_percent),
-  //     treasuryPercent: bn(orpConfig.treasury_percent),
-  //     feeBasisPoints: bn(orpConfig.fee_basis_points),
-  //     feeBase: bn(orpConfig.fee_base),
-  //   },
-  //   [
-  //     Array.from(orpAccount1Address.toBytes()),
-  //     Array.from(orpAccount2Address.toBytes()),
-  //     Array.from(orpAccount3Address.toBytes()),
-  //     Array.from(orpAccount4Address.toBytes()),
-  //   ],
-  //   [orpAccount1, orpAccount2, orpAccount3, orpAccount4]
-  // )
-  // console.log({
-  //   payer: purchaser.publicKey,
-  //   receiver: purchaser.publicKey,
-  //   release,
-  //   releaseSigner,
-  //   mint: mint.publicKey,
-  //   paymentMint: paymentMint.publicKey,
-  //   paymentTokenAccount: purchaserAta,
-  //   royaltyTokenAccount,
-  //   receiverReleaseTokenAccount: associatedAddress({
-  //     mint: mint.publicKey,
-  //     owner: purchaser.publicKey,
-  //     tokenProgramId: TOKEN_2022_PROGRAM_ID,
-  //   }),
-  //   systemProgram: anchor.web3.SystemProgram.programId,
-  //   associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
-  //   tokenProgram: TOKEN_PROGRAM_ID,
-  //   token2022Program: TOKEN_2022_PROGRAM_ID,
-  //   orpProgram: orpProgramId,
-  //   orpCpiAuthorityPda: cpiAuthorityPda,
-  //   orpPool: orpPoolPublicKey,
-  //   treasuryTokenAccount: treasuryAddress,
-  //   lightSystemProgram: LightSystemProgram.programId,
-  //   accountCompressionAuthority,
-  //   noopProgram,
-  //   accountCompressionProgram,
-  //   registeredProgramPda,
-  // })
-
-  console.log([
-    Array.from(orpAccount1Address.toBytes()),
-    Array.from(orpAccount2Address.toBytes()),
-    Array.from(orpAccount3Address.toBytes()),
-    Array.from(orpAccount4Address.toBytes()),
-  ])
+    console.log('crsTokenAccount', crsTokenAccount)
     const ix = await program.methods
       .releasePurchase(
         new anchor.BN(RELEASE_PRICE),
         releaseSignerBump,
-        orpAccountProof.compressedProof,
-        {
-          merkleTreePubkeyIndex:
-            packedInputCompressedAccounts[0].merkleContext
-              .merkleTreePubkeyIndex,
-          nullifierQueuePubkeyIndex:
-            packedInputCompressedAccounts[0].merkleContext
-              .nullifierQueuePubkeyIndex,
-        },
-        packedInputCompressedAccounts[0].rootIndex,
-        orpAccountProof.leafIndices,
-        {
-          address: Array.from(orpConfigAddress.toBytes()),
-          authority: Array.from(orpConfig.authority),
-          pool: Array.from(orpConfig.pool),
-          firstMinterPercent: bn(orpConfig.first_minter_percent),
-          inviteReferralPercent: bn(orpConfig.invite_referral_percent),
-          purchaseReferralPercent: bn(orpConfig.purchase_referral_percent),
-          topSupportersPercent: bn(orpConfig.top_supporters_percent),
-          treasuryPercent: bn(orpConfig.treasury_percent),
-          feeBasisPoints: bn(orpConfig.fee_basis_points),
-          feeBase: bn(orpConfig.fee_base),
-        },
-        [
-          Array.from(orpAccount1Address.toBytes()),
-          Array.from(orpAccount2Address.toBytes()),
-          Array.from(orpAccount3Address.toBytes()),
-          Array.from(orpAccount4Address.toBytes()),
-        ],
-        [orpAccount1, orpAccount2, orpAccount3, orpAccount4]
       )
       .accounts({
         payer: purchaser.publicKey,
@@ -560,48 +254,396 @@ console.log('registeredProgramPda', registeredProgramPda)
           owner: purchaser.publicKey,
           tokenProgramId: TOKEN_2022_PROGRAM_ID,
         }),
+        crsTokenAccount,
         systemProgram: anchor.web3.SystemProgram.programId,
         associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
         tokenProgram: TOKEN_PROGRAM_ID,
         token2022Program: TOKEN_2022_PROGRAM_ID,
-        orpProgram: orpProgramId,
-        orpCpiAuthorityPda: cpiAuthorityPda,
-        orpPool: orpPoolPublicKey,
-        treasuryTokenAccount: treasuryAddress,
-        lightSystemProgram: LightSystemProgram.programId,
-        accountCompressionAuthority,
-        noopProgram,
-        accountCompressionProgram,
-        registeredProgramPda,
       })
-      .remainingAccounts(formatRemainingAccounts(remainingAccounts))
       .instruction();
-
-      const lookupTableAccount = (
-        await lightConnection.getAddressLookupTable(lookupTableAddress)
-      ).value;
   
     const txid = await buildSignAndSendTransaction(
       [modifyComputeUnits, addPriorityFee, ix],
       purchaser,
       lightConnection,
-      [lookupTableAccount]
+      []
     ).catch((err) => {
       console.log("Error", err);
     });
-
+    if (txid) {
+      const latestBlockHash = await lightConnection.getLatestBlockhash();
+      await lightConnection.confirmTransaction(
+        {
+          blockhash: latestBlockHash.blockhash,
+          lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
+          signature: txid,
+        },
+        'finalized',
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
     console.log("txid", txid);
+
+    // const crsBalance = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
+
+    const purchaserTokenBalance = await lightConnection.getTokenAccountBalance(purchaserAta, 'confirmed');
+    const royaltyTokenBalance = await lightConnection.getTokenAccountBalance(royaltyTokenAccount, 'confirmed');
+    expect(Number(purchaserTokenBalance.value.amount)).to.equal(Number(purchaserTokenBalanceBefore.value.amount) - (RELEASE_PRICE));
+    // expect(Number(crsBalance.value.amount)).to.equal(RELEASE_PRICE);
+    expect(Number(royaltyTokenBalance.value.amount)).to.equal(RELEASE_PRICE);
+  });
+
+  it("Initialize A $20 Release for publisher with paymentMint ATA", async () => {
+    const balanceBefore = await lightConnection.getBalance(payer.publicKey);
+    console.log("Balance before", balanceBefore);
+
+    const { txid } = await buildAndSendReleaseInitV2Transaction(
+      program,
+      payer,
+      artist,
+      lightConnection,
+      paymentMint,
+      mint2,
+      undefined,
+      RELEASE_PRICE * 20
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const balanceAfter = await lightConnection.getBalance(
+      payer.publicKey,
+      "finalized"
+    );
+    console.log("Balance after", balanceAfter);
+
+    if (txid) {
+      const latestBlockHash = await lightConnection.getLatestBlockhash();
+      await lightConnection.confirmTransaction(
+        {
+          blockhash: latestBlockHash.blockhash,
+          lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
+          signature: txid,
+        },
+        'finalized',
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+  });
+
+  it("Purchase a Release", async () => {
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+    const purchaserTokenBalanceBefore = await lightConnection.getTokenAccountBalance(purchaserAta, 'finalized');
+    // const crsBalanceBefore = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'finalized');
+    const royaltyTokenBalanceBefore = await lightConnection.getTokenAccountBalance(royaltyTokenAccount, 'finalized');
+
+    const [release] = await anchor.web3.PublicKey.findProgramAddress(
+      [
+        Buffer.from(anchor.utils.bytes.utf8.encode("nina-release")),
+        mint2.publicKey.toBuffer(),
+      ],
+      program.programId
+    );
+    const [releaseSigner, releaseSignerBump] =
+      anchor.web3.PublicKey.findProgramAddressSync(
+        [release.toBuffer()],
+        program.programId
+      );
+
+      console.log('royaltyTokenAccount', royaltyTokenAccount)
+      console.log({
+        payer: payer.publicKey,
+        receiver: purchaser.publicKey,
+        release,
+        releaseSigner,
+        mint: mint2.publicKey,
+        paymentMint: paymentMint.publicKey,
+        paymentTokenAccount: purchaserAta,
+        royaltyTokenAccount,
+        receiverReleaseTokenAccount: associatedAddress({
+          mint: mint2.publicKey,
+          owner: purchaser.publicKey,
+          tokenProgramId: TOKEN_2022_PROGRAM_ID,
+        }),
+        // crsTokenAccount,
+        systemProgram: anchor.web3.SystemProgram.programId,
+        associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        token2022Program: TOKEN_2022_PROGRAM_ID,
+      })
+
+    
+    const ix = await program.methods
+      .releasePurchase(
+        new anchor.BN(RELEASE_PRICE * 20),
+        releaseSignerBump,
+      )
+      .accounts({
+        payer: purchaser.publicKey,
+        receiver: purchaser.publicKey,
+        release,
+        releaseSigner,
+        mint: mint2.publicKey,
+        paymentMint: paymentMint.publicKey,
+        paymentTokenAccount: purchaserAta,
+        royaltyTokenAccount,
+        receiverReleaseTokenAccount: associatedAddress({
+          mint: mint2.publicKey,
+          owner: purchaser.publicKey,
+          tokenProgramId: TOKEN_2022_PROGRAM_ID,
+        }),
+        // crsTokenAccount,
+        systemProgram: anchor.web3.SystemProgram.programId,
+        associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        token2022Program: TOKEN_2022_PROGRAM_ID,
+      })
+      .instruction();
+  
+    const txid = await buildSignAndSendTransaction(
+      [modifyComputeUnits, addPriorityFee, ix],
+      purchaser,
+      lightConnection,
+      []
+    ).catch((err) => {
+      console.log("Error", err);
+    });
+    console.log('txid', txid)
+    if (txid) {
+      const latestBlockHash = await lightConnection.getLatestBlockhash();
+      await lightConnection.confirmTransaction(
+        {
+          blockhash: latestBlockHash.blockhash,
+          lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
+          signature: txid,
+        },
+        'confirmed',
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+    console.log("txid", txid);
+
+    // const crsBalance = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
+    // console.log("crsBalance", crsBalance);
+    // expect(Number(crsBalance.value.amount)).to.equal(Number(crsBalanceBefore.value.amount) + (RELEASE_PRICE * 2));
+
+    const purchaserTokenBalance = await lightConnection.getTokenAccountBalance(purchaserAta, 'confirmed');
+    expect(Number(purchaserTokenBalance.value.amount)).to.equal(Number(purchaserTokenBalanceBefore.value.amount) - (RELEASE_PRICE * 20));
+
+    const royaltyTokenBalance = await lightConnection.getTokenAccountBalance(royaltyTokenAccount, 'confirmed');
+    expect(Number(royaltyTokenBalance.value.amount)).to.equal(Number(royaltyTokenBalanceBefore.value.amount) + (RELEASE_PRICE * 20));
+  });
+
+  it("Initialize A Release and Purchase", async () => {
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+    const purchaserTokenBalanceBefore = await lightConnection.getTokenAccountBalance(purchaserAta, 'confirmed');
+    // const crsBalanceBefore = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
+    const royaltyTokenBalanceBefore = royaltyTokenAccount ? await lightConnection.getTokenAccountBalance(royaltyTokenAccount, 'confirmed') : 0;
+
+    const [release] = await anchor.web3.PublicKey.findProgramAddress(
+      [
+        Buffer.from(anchor.utils.bytes.utf8.encode("nina-release")),
+        mint3.publicKey.toBuffer(),
+      ],
+      program.programId
+    );
+    const [releaseSigner, releaseSignerBump] =
+      anchor.web3.PublicKey.findProgramAddressSync(
+        [release.toBuffer()],
+        program.programId
+      );
+    const royaltyTokenAccountAddress = await getAssociatedTokenAddress(
+      paymentMint.publicKey,
+      artist.publicKey,
+      false,
+      TOKEN_PROGRAM_ID,
+      ASSOCIATED_PROGRAM_ID
+    );
+    royaltyTokenAccount = royaltyTokenAccountAddress;
+    console.log('royaltyTokenAccount', royaltyTokenAccount)
+    let royaltyTokenAccountExists;
+    try {
+      await getAccount(lightConnection, royaltyTokenAccountAddress);
+      royaltyTokenAccountExists = true;
+      console.log('royaltyTokenAccountExists', royaltyTokenAccountExists)
+    } catch (error) {
+      royaltyTokenAccountExists = false;
+      console.log('royaltyTokenAccountExists', royaltyTokenAccountExists)
+    }
+  
+    let instructions = [];
+    if (!royaltyTokenAccountExists) {
+      instructions.push(
+        createAssociatedTokenAccountInstruction(
+          payer.publicKey,
+          royaltyTokenAccountAddress,
+          artist.publicKey,
+          paymentMint.publicKey,
+          TOKEN_PROGRAM_ID,
+          ASSOCIATED_PROGRAM_ID
+        )
+      );
+    }
+
+    console.log({
+      payer: purchaser.publicKey,
+      receiver: purchaser.publicKey,
+      authority: artist.publicKey,
+      release,
+      releaseSigner,
+      mint: mint3.publicKey,
+      paymentMint: paymentMint.publicKey,
+      paymentTokenAccount: purchaserAta,
+      royaltyTokenAccount,
+      receiverReleaseTokenAccount: associatedAddress({
+        mint: mint3.publicKey,
+        owner: purchaser.publicKey,
+        tokenProgramId: TOKEN_PROGRAM_ID,
+      }),
+      // crsTokenAccount,
+      systemProgram: anchor.web3.SystemProgram.programId,
+      associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      token2022Program: TOKEN_2022_PROGRAM_ID,
+    })
+    const ix = await program.methods
+      .releaseInitAndPurchase(
+        releaseSignerBump,
+        `https://arweave.net/rb9wx261pn2nCbiHtoqR2vQtZ3MRQ3qcyZeSSCE0Rm4`,
+        "Nina Test",
+        "NINA",
+        new anchor.BN(100),
+        new anchor.BN(RELEASE_PRICE),
+      )
+      .accountsStrict({
+        payer: purchaser.publicKey,
+        receiver: purchaser.publicKey,
+        authority: artist.publicKey,
+        release,
+        mint: mint3.publicKey,
+        releaseSigner,
+        paymentMint: paymentMint.publicKey,
+        paymentTokenAccount: purchaserAta,
+        royaltyTokenAccount,
+        receiverReleaseTokenAccount: associatedAddress({
+          mint: mint3.publicKey,
+          owner: purchaser.publicKey,
+          tokenProgramId: TOKEN_2022_PROGRAM_ID,
+        }),
+        crsTokenAccount,
+        systemProgram: anchor.web3.SystemProgram.programId,
+        associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        token2022Program: TOKEN_2022_PROGRAM_ID,
+      })
+      .instruction();
+
+      
+    const txid = await buildSignAndSendTransaction(
+      [modifyComputeUnits, addPriorityFee, ...instructions, ix],
+      purchaser,
+      lightConnection,
+      [],
+      [mint3]
+    );
+    if (txid) {
+      const latestBlockHash = await lightConnection.getLatestBlockhash();
+      await lightConnection.confirmTransaction(
+        {
+          blockhash: latestBlockHash.blockhash,
+          lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
+          signature: txid,
+        },
+        'finalized',
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    console.log("txid", txid);
+
+    // const crsBalance = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
+    // console.log("crsBalance", crsBalance);
+    // expect(Number(crsBalance.value.amount)).to.equal(Number(crsBalanceBefore.value.amount) + RELEASE_PRICE);
+
+    const purchaserTokenBalance = await lightConnection.getTokenAccountBalance(purchaserAta, 'confirmed');
+    expect(Number(purchaserTokenBalance.value.amount)).to.equal(Number(purchaserTokenBalanceBefore.value.amount) - (RELEASE_PRICE));
+
+    const royaltyTokenBalance = await lightConnection.getTokenAccountBalance(royaltyTokenAccount, 'confirmed');
+    expect(Number(royaltyTokenBalance.value.amount)).to.equal(Number(royaltyTokenBalanceBefore === 0 ? 0 : royaltyTokenBalanceBefore.value.amount) + RELEASE_PRICE);
+  });
+
+  it("Update Metadata", async () => {
+    const [release] = await anchor.web3.PublicKey.findProgramAddress(
+      [
+        Buffer.from(anchor.utils.bytes.utf8.encode("nina-release")),
+        mint3.publicKey.toBuffer(),
+      ],
+      program.programId
+    );
+    const [releaseSigner, releaseSignerBump] =
+      anchor.web3.PublicKey.findProgramAddressSync(
+        [release.toBuffer()],
+        program.programId
+      );
+    const ix = await program.methods
+      .releaseUpdate(
+        `https://arweave.net/ZIdtfNs7XKWlIz3_n1CnfYhKNHlWgnHyM7SfNXrZ1aQ`,
+        "Nina Test2",
+        "NINA2",  
+        releaseSignerBump,
+        new anchor.BN(RELEASE_PRICE * 5),
+        new anchor.BN(1000),
+      )
+      .accountsStrict({
+        payer: artist.publicKey,
+        authority: artist.publicKey,
+        release,
+        releaseSigner,
+        mint: mint3.publicKey,
+        systemProgram: anchor.web3.SystemProgram.programId,
+        token2022Program: TOKEN_2022_PROGRAM_ID,
+      })
+      .instruction();
+    const txid = await buildSignAndSendTransaction(
+      [modifyComputeUnits, addPriorityFee, ix],
+      artist,
+      lightConnection,
+      [],
+    );
+
+    if (txid) {
+      const latestBlockHash = await lightConnection.getLatestBlockhash();
+      await lightConnection.confirmTransaction(
+        {
+          blockhash: latestBlockHash.blockhash,
+          lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
+          signature: txid,
+        },
+        'finalized',
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    console.log("txid", txid);
+
+    const metadata = await getTokenMetadata(lightConnection, mint3.publicKey, 'confirmed');
+    console.log("metadata", metadata);
+    expect(metadata.uri).to.equal(`https://arweave.net/ZIdtfNs7XKWlIz3_n1CnfYhKNHlWgnHyM7SfNXrZ1aQ`);
+    expect(metadata.name).to.equal("Nina Test2");
+    expect(metadata.symbol).to.equal("NINA2");
+
+    const releaseData = await program.account.releaseV2.fetch(release);
+    expect(Number(releaseData.price)).to.equal(RELEASE_PRICE * 5);
+    expect(Number(releaseData.totalSupply)).to.equal(1000);
   });
 });
 
 const buildAndSendReleaseInitV2Transaction = async (
   program: Program<NinaV2>,
   payer: Keypair,
-  lightConnection: Rpc,
+  artist: Keypair,
+  lightConnection: anchor.web3.Connection,
   paymentMint: Keypair,
   mint: Keypair,
   lookupTableAddress: PublicKey,
-  orpDeployer: Keypair
+  price: number = RELEASE_PRICE,
 ) => {
   const [release] = await anchor.web3.PublicKey.findProgramAddress(
     [
@@ -610,21 +652,18 @@ const buildAndSendReleaseInitV2Transaction = async (
     ],
     program.programId
   );
-  console.log("release", release);
   const [releaseSigner, releaseSignerBump] =
     anchor.web3.PublicKey.findProgramAddressSync(
       [release.toBuffer()],
       program.programId
     );
-  console.log("releaseSigner", releaseSigner);
   const associatedAddress = await getAssociatedTokenAddress(
     paymentMint.publicKey,
-    releaseSigner,
-    true,
+    artist.publicKey,
+    false,
     TOKEN_PROGRAM_ID,
     ASSOCIATED_PROGRAM_ID
   );
-  console.log("associatedAddress", associatedAddress);
   royaltyTokenAccount = associatedAddress;
   let royaltyTokenAccountExists;
   try {
@@ -640,41 +679,43 @@ const buildAndSendReleaseInitV2Transaction = async (
       createAssociatedTokenAccountInstruction(
         payer.publicKey,
         associatedAddress,
-        releaseSigner,
+        artist.publicKey,
         paymentMint.publicKey,
         TOKEN_PROGRAM_ID,
         ASSOCIATED_PROGRAM_ID
       )
     );
   }
-  console.log("instructions", instructions);
+
   const ix = await program.methods
     .releaseInitV2(
       `https://arweave.net/rb9wx261pn2nCbiHtoqR2vQtZ3MRQ3qcyZeSSCE0Rm4`,
       "Nina Test",
       "NINA",
       new anchor.BN(100),
-      new anchor.BN(RELEASE_PRICE),
+      new anchor.BN(price),
       releaseSignerBump
     )
     .accountsStrict({
       payer: payer.publicKey,
-      authority: payer.publicKey,
+      authority: artist.publicKey,
       release,
       mint: mint.publicKey,
       releaseSigner,
       paymentMint: paymentMint.publicKey,
-      royaltyTokenAccount: associatedAddress,
+      royaltyTokenAccount,
       systemProgram: anchor.web3.SystemProgram.programId,
       associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
       tokenProgram: TOKEN_PROGRAM_ID,
       token2022Program: TOKEN_2022_PROGRAM_ID,
     })
     .instruction();
-  console.log("ix", ix);
-    const lookupTableAccount = (
+  let lookupTableAccount;
+  if (lookupTableAddress) {
+    lookupTableAccount = (
       await lightConnection.getAddressLookupTable(lookupTableAddress)
     ).value;
+  }
 
   const { blockhash } = await lightConnection.getLatestBlockhash();
 
@@ -682,40 +723,11 @@ const buildAndSendReleaseInitV2Transaction = async (
       payerKey: payer.publicKey,
       recentBlockhash: blockhash,
       instructions: [modifyComputeUnits, addPriorityFee, ...instructions, ix],
-    }).compileToV0Message([lookupTableAccount])
-    console.log("messageV0", messageV0)
+    }).compileToV0Message(lookupTableAccount ? [lookupTableAccount] : [])
     const tx = new anchor.web3.VersionedTransaction(messageV0)
-    console.log("tx", tx)
     tx.sign([payer, mint])
     const txid = await lightConnection.sendRawTransaction(tx.serialize())
   console.log("Your transaction signature", txid);
-
-  
-  const extendInstruction = anchor.web3.AddressLookupTableProgram.extendLookupTable({
-    payer: orpDeployer.publicKey,
-    authority: orpDeployer.publicKey,
-    lookupTable: lookupTableAddress,
-    addresses: [
-      release,
-      releaseSigner,
-      mint.publicKey,
-      associatedAddress,
-      payer.publicKey,
-    ],
-  });
-  const messageV02 = new anchor.web3.TransactionMessage({
-    payerKey: orpDeployer.publicKey,
-    recentBlockhash: blockhash,
-    instructions: [modifyComputeUnits, addPriorityFee, extendInstruction],
-  }).compileToV0Message([lookupTableAccount])
-  console.log("messageV0", messageV02)
-  const tx2 = new anchor.web3.VersionedTransaction(messageV02)
-  console.log("tx", tx2)
-  tx2.sign([orpDeployer])
-  const txid2 = await lightConnection.sendRawTransaction(tx2.serialize())
-
-  console.log("extended release account lookup txid", txid2);
-
 
   return { release, txid };
 };
