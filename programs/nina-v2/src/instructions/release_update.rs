@@ -16,6 +16,7 @@ use crate::state::ReleaseV2;
 use crate::instructions::release_init_v2::update_mint_balance;
 use crate::utils::file_service_account_key;
 use crate::errors::NinaError;
+
 #[derive(Accounts)]
 #[instruction(
   uri: String,
