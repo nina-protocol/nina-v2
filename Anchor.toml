@@ -19,7 +19,7 @@ nina_v2 = "nina2DQvAA8Sa9rxG72swBcNNDYQxdWGojzwDk9yn2q"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "devnet"
+cluster = "localnet"
 wallet = "/Users/michaelpollard/.config/solana/nina.json"
 
 [scripts]
