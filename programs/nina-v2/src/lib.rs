@@ -71,4 +71,10 @@ pub mod nina_v2 {
     ) -> Result<()> {
         instructions::release_update::handler(ctx, uri, name, symbol, release_signer_bump, price, total_supply)
     }
+
+    pub fn release_close<'c: 'info, 'info>(
+        ctx: Context<'_, '_, 'c, 'info, ReleaseClose<'info>>,
+    ) -> Result<()> {
+        instructions::release_close::handler(ctx)
+    }
 }
