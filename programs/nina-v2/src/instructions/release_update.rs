@@ -29,10 +29,11 @@ use crate::errors::NinaError;
 pub struct ReleaseUpdate<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
+    /// CHECK: This is safe because it is checked on the file service
     #[account(
       constraint = authority.key() == release.authority,
     )]
-    pub authority: Signer<'info>,
+    pub authority: UncheckedAccount<'info>,
     /// CHECK: This is safe because it is derived from release which is checked above
     #[account(
       mut,
