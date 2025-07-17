@@ -12,7 +12,7 @@ use anchor_spl::{
 
 use crate::state::ReleaseV2;
 use crate::errors::NinaError;
-use crate::utils::file_service_account_key;
+use crate::utils::id_account_key;
 
 const BASIS_POINTS: u64 = 1_000_000;
 const ONE_USDC: u64 = 10_000_000;
@@ -28,7 +28,7 @@ pub struct ReleasePurchase<'info> {
     pub payer: Signer<'info>,
     /// CHECK: can be any account
     #[account(mut)]
-    pub receiver: UncheckedAccount<'info>,
+    pub receiver: Signer<'info>,
     #[account(
         seeds = [b"nina-release", mint.key().as_ref()],
         bump,
@@ -88,7 +88,7 @@ pub fn handler<'c: 'info, 'info>(
 ) -> Result<()> {
     if ctx.accounts.payer.key() != ctx.accounts.receiver.key() {
         #[cfg(feature = "is-test")]
-        if ctx.accounts.payer.key() != file_service_account_key() {
+        if ctx.accounts.payer.key() != id_account_key() {
             return Err(error!(NinaError::DelegatedPayerMismatch));
         }
     }
@@ -142,14 +142,14 @@ pub fn validate_purchase<'info>(
 pub fn transfer_payment<'info>(
     payment_token_account: &InterfaceAccount<'info, TokenAccount>,
     royalty_token_account: &InterfaceAccount<'info, TokenAccount>,
-    receiver: &UncheckedAccount<'info>,
+    payer: &Signer<'info>,
     token_program: &Program<'info, Token>,
     amount: u64,
 ) -> Result<()> {
     let cpi_accounts = Transfer {
         from: payment_token_account.to_account_info(),
         to: royalty_token_account.to_account_info(),
-        authority: receiver.to_account_info(),
+        authority: payer.to_account_info(),
     };
     
     let cpi_ctx_transfer = CpiContext::new(
