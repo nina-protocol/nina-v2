@@ -147,7 +147,7 @@ pub fn handler(
     transfer_payment(
         &ctx.accounts.payment_token_account,
         &ctx.accounts.royalty_token_account,
-        &ctx.accounts.receiver,
+        &ctx.accounts.payer,
         &ctx.accounts.token_program,
         price,
     )?;

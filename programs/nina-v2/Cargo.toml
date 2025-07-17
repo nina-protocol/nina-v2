@@ -18,10 +18,11 @@ idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 is-test = [] 
 
 [dependencies]
-anchor-lang = { version = "0.31.0", features = ["init-if-needed", "lazy-account"] }
-anchor-spl = "0.31.0"
+anchor-lang = { version = "0.31.1", features = ["init-if-needed", "lazy-account"] }
+anchor-spl = "0.31.1"
 solana-zk-token-sdk = "2.2.1"
 spl-tlv-account-resolution = "0.6.3"
 spl-transfer-hook-interface = "0.6.3"
 spl-type-length-value = "0.4.3"
 spl-pod = "0.2.2"
+proc-macro2 = "1.0.95"

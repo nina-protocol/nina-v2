@@ -65,3 +65,8 @@ pub fn get_meta_list_size(approve_account: Option<Pubkey>) -> usize {
 pub fn file_service_account_key() -> Pubkey {
   Pubkey::from_str("HQUtBQzt8d5ZtxAwfbPLE6TpBq68wJQ7ZaSjQDEn4Hz6").unwrap()
 }
+
+pub fn id_account_key() -> Pubkey {
+  Pubkey::from_str("BnhxwsrY5aaeMehsTRoJzX2X4w5sKMhMfBs2MCKUqMC").unwrap()
+}
+
