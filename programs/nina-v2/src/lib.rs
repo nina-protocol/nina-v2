@@ -40,6 +40,14 @@ pub mod nina_v2 {
         )
     }
 
+    pub fn release_claim<'c: 'info, 'info>(
+        ctx: Context<'_, '_, 'c, 'info, ReleaseClaim<'info>>,
+        amount: u64,
+        release_signer_bump: u8,
+    ) -> Result<()> {
+        instructions::release_claim::handler(ctx, amount, release_signer_bump)
+    }
+
     pub fn release_init_and_purchase<'c: 'info, 'info>(
         ctx: Context<'_, '_, 'c, 'info, ReleaseInitAndPurchase<'info>>,
         release_signer_bump: u8,

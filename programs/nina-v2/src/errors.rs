@@ -12,4 +12,6 @@ pub enum NinaError {
     ArithmeticError,
     #[msg("Delegated Payer Mismatch")]
     DelegatedPayerMismatch,
+    #[msg("Release Claim not free")]
+    ReleaseClaimNotFree,
 }
