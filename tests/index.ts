@@ -509,7 +509,8 @@ describe("nina-v2", () => {
     const ix = await program.methods
       .releaseInitAndPurchase(
         releaseSignerBump,
-        `https://arweave.net/rb9wx261pn2nCbiHtoqR2vQtZ3MRQ3qcyZeSSCE0Rm4`,
+        `rb9wx261pn2nCbiHtoqR2vQtZ3MRQ3qcyZeSSCE0Rm4`,
+        1,
         "Nina Test",
         "NINA",
         new anchor.BN(100),
@@ -646,7 +647,8 @@ describe("nina-v2", () => {
     const ix = await program.methods
       .releaseInitAndPurchase(
         releaseSignerBump,
-        `https://arweave.net/rb9wx261pn2nCbiHtoqR2vQtZ3MRQ3qcyZeSSCE0Rm4`,
+        `rb9wx261pn2nCbiHtoqR2vQtZ3MRQ3qcyZeSSCE0Rm4`,
+        1,
         "Nina Test",
         "NINA",
         new anchor.BN(100),

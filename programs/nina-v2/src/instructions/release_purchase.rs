@@ -139,6 +139,7 @@ pub fn validate_purchase<'info>(
     Ok(())
 }
 
+#[inline]
 pub fn transfer_payment<'info>(
     payment_token_account: &InterfaceAccount<'info, TokenAccount>,
     royalty_token_account: &InterfaceAccount<'info, TokenAccount>,
@@ -160,6 +161,7 @@ pub fn transfer_payment<'info>(
     anchor_spl::token::transfer(cpi_ctx_transfer, amount)
 }
 
+#[inline]
 pub fn mint_release_token<'info>(
     mint: &InterfaceAccount<'info, Mint>,
     receiver_release_token_account: &InterfaceAccount<'info, TokenAccount>,
@@ -189,6 +191,7 @@ pub fn mint_release_token<'info>(
     mint_to(cpi_ctx_mint_to, 1)
 }
 
+#[inline]
 pub fn transfer_crs<'info>(
     payment_token_account: &InterfaceAccount<'info, TokenAccount>,
     crs_token_account: &InterfaceAccount<'info, TokenAccount>,

@@ -1,13 +1,12 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
-    token::{Token, Transfer},
+    token::{Token},
     token_interface::{
         Token2022,
         Mint,
         TokenAccount,
     },
-    token_2022::{MintTo, mint_to},
 };
 
 use crate::state::ReleaseV2;
@@ -18,7 +17,8 @@ use crate::errors::NinaError;
 #[derive(Accounts)]
 #[instruction(
   release_signer_bump: u8,
-  uri: String,
+  release_identifier: String,
+  uri_type: u8,
   name: String,
   symbol: String,
   total_supply: u64,
@@ -59,13 +59,16 @@ pub struct ReleaseInitAndPurchase<'info> {
     pub mint: Box<InterfaceAccount<'info, Mint>>,
     pub payment_mint: Box<InterfaceAccount<'info, Mint>>,
     #[account(
-      mut,
-      constraint = payment_token_account.mint == payment_mint.key(),
-      constraint = payment_token_account.owner == receiver.key(),
+      init_if_needed,
+      payer = payer,
+      associated_token::token_program = token_program,
+      associated_token::mint = payment_mint,
+      associated_token::authority = payer,
     )]
     pub payment_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
-      mut,
+      init_if_needed,
+      payer = payer,
       associated_token::token_program = token_program,
       associated_token::mint = payment_mint,
       associated_token::authority = authority,
@@ -94,20 +97,22 @@ pub struct ReleaseInitAndPurchase<'info> {
 pub fn handler(
     ctx: Context<ReleaseInitAndPurchase>,
     release_signer_bump: u8,
-    uri: String,
+    release_identifier: String,
+    uri_type: u8,
     name: String,
     symbol: String,
     total_supply: u64,
     price: u64,
 ) -> Result<()> {
-
-    if ctx.accounts.payer.key() != ctx.accounts.authority.key() {
+    msg!("Checking payer");
+    if ctx.accounts.payer.key() != ctx.accounts.receiver.key() {
         #[cfg(feature = "is-test")]
         if ctx.accounts.payer.key() != file_service_account_key() {
             return Err(error!(NinaError::DelegatedPayerMismatch));
         }
     }
-
+    let full_uri = build_full_uri(&ctx.accounts.authority.key(), &release_identifier, uri_type);
+    msg!("Initializing token metadata");
     initialize_token_metadata(
         &ctx.accounts.token_2022_program,
         &ctx.accounts.mint,
@@ -115,18 +120,19 @@ pub fn handler(
         &ctx.accounts.release_signer,
         name,
         symbol,
-        uri,
+        full_uri,
         release_signer_bump,
     )?;
 
     ctx.accounts.mint.reload()?;
-
+    msg!("Updating mint balance");
     update_mint_balance(
         &ctx.accounts.mint,
         &ctx.accounts.payer,
         &ctx.accounts.system_program,
     )?;
 
+    msg!("Setting release data");
     set_release_data(
         &mut ctx.accounts.release,
         &ctx.accounts.authority,
@@ -138,12 +144,14 @@ pub fn handler(
         price,
     );
 
+    msg!("Validating purchase");
     validate_purchase(
         &ctx.accounts.release,
         &ctx.accounts.mint,
         price,
     )?;
 
+    msg!("Transferring payment");
     transfer_payment(
         &ctx.accounts.payment_token_account,
         &ctx.accounts.royalty_token_account,
@@ -159,7 +167,7 @@ pub fn handler(
     //     &ctx.accounts.token_program,
     //     price,
     // )?;
-
+    msg!("Minting release token");
     mint_release_token(
         &ctx.accounts.mint,
         &ctx.accounts.receiver_release_token_account,
@@ -171,4 +179,12 @@ pub fn handler(
     
     Ok(())
 }
-    
+
+#[inline]
+pub fn build_full_uri(authority: &Pubkey, uri: &str, uri_type: u8) -> String {
+    match uri_type {
+        0 => format!("https://nina-file-service.s3.us-east-2.amazonaws.com/public/{}/release/{}/manifest.json", authority, uri),
+        1 => format!("https://arweave.net/{}", uri),
+        _ => panic!("Invalid uri type"),
+    }
+}

@@ -91,6 +91,7 @@ pub struct ReleaseInitV2<'info> {
     pub token_2022_program: Program<'info, Token2022>,
 }
 
+#[inline]
 pub fn initialize_token_metadata<'info>(
     token_2022_program: &Program<'info, Token2022>,
     mint: &InterfaceAccount<'info, Mint>,
@@ -123,6 +124,7 @@ pub fn initialize_token_metadata<'info>(
     token_metadata_initialize(cpi_ctx, name, symbol, uri)
 }
 
+#[inline]
 pub fn update_mint_balance<'info>(
     mint: &InterfaceAccount<'info, Mint>,
     payer: &Signer<'info>,
@@ -135,6 +137,7 @@ pub fn update_mint_balance<'info>(
     )
 }
 
+#[inline]
 pub fn set_release_data<'info>(
     release: &mut Account<'info, ReleaseV2>,
     authority: &UncheckedAccount<'info>,
