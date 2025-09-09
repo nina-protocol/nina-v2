@@ -765,8 +765,7 @@ describe("nina-v2", () => {
       );
     const ix = await program.methods
       .releaseUpdate(
-        `ZIdtfNs7XKWlIz3_n1CnfYhKNHlWgnHyM7SfNXrZ1aQ`,
-        1,
+        `https://arweave.net/ZIdtfNs7XKWlIz3_n1CnfYhKNHlWgnHyM7SfNXrZ1aQ`,
         "Nina Test2",
         "NINA2",  
         releaseSignerBump,

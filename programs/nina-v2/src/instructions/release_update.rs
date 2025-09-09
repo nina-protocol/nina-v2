@@ -16,12 +16,10 @@ use crate::state::ReleaseV2;
 use crate::instructions::release_init_v2::update_mint_balance;
 use crate::utils::file_service_account_key;
 use crate::errors::NinaError;
-use crate::instructions::release_init_and_purchase::build_full_uri;
 
 #[derive(Accounts)]
 #[instruction(
-  release_identifier: String,
-  uri_type: u8,
+  uri: String,
   name: String,
   symbol: String,
   release_signer_bump: u8,
@@ -59,8 +57,7 @@ pub struct ReleaseUpdate<'info> {
 
 pub fn handler(
   ctx: Context<ReleaseUpdate>,
-  release_identifier: String,
-  uri_type: u8,
+  uri: String,
   name: String,
   symbol: String,
   release_signer_bump: u8,
@@ -75,8 +72,6 @@ pub fn handler(
           return Err(error!(NinaError::DelegatedPayerMismatch));
       }
   }
-
-    let full_uri = build_full_uri(&ctx.accounts.authority.key(), &release_identifier, uri_type);
 
     let cpi_accounts_uri = TokenMetadataUpdateField {
         program_id: ctx.accounts.token_2022_program.to_account_info(),
@@ -120,7 +115,7 @@ pub fn handler(
         signer,
     );
 
-    token_metadata_update_field(cpi_ctx_uri, Field::Uri, full_uri)?;
+    token_metadata_update_field(cpi_ctx_uri, Field::Uri, uri)?;
     token_metadata_update_field(cpi_ctx_name, Field::Name, name)?;
     token_metadata_update_field(cpi_ctx_symbol, Field::Symbol, symbol)?;
 
