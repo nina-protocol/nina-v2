@@ -69,12 +69,12 @@ pub struct ReleasePurchase<'info> {
         associated_token::authority = receiver,
     )]
     pub receiver_release_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
-    ///TODO: CHECK THAT ADDRESS === EXPECTED CRS ADDRESS
-    // #[account(
-    //   mut,
-    //   constraint = crs_token_account.mint == release.payment_mint,
-    // )]
-    // pub crs_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
+    #[account(
+      mut,
+      constraint = crs_token_account.mint == release.payment_mint,
+      constraint = crs_token_account.owner == pubkey!("crsNECAdnFS1dUM136E13AuARA5XPCBqAy2gTzyp7dv"),
+    )]
+    pub crs_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
     pub system_program: Program<'info, System>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub token_program: Program<'info, Token>,
@@ -103,13 +103,13 @@ pub fn handler<'c: 'info, 'info>(
         amount,
     )?;
     
-    // transfer_crs(
-    //     &ctx.accounts.payment_token_account,
-    //     &ctx.accounts.crs_token_account,
-    //     &ctx.accounts.receiver,
-    //     &ctx.accounts.token_program,
-    //     amount,
-    // )?;
+    transfer_crs(
+        &ctx.accounts.payment_token_account,
+        &ctx.accounts.crs_token_account,
+        &ctx.accounts.receiver,
+        &ctx.accounts.token_program,
+        amount,
+    )?;
     
     mint_release_token(
         &ctx.accounts.mint,
@@ -192,18 +192,18 @@ pub fn mint_release_token<'info>(
 pub fn transfer_crs<'info>(
     payment_token_account: &InterfaceAccount<'info, TokenAccount>,
     crs_token_account: &InterfaceAccount<'info, TokenAccount>,
-    receiver: &UncheckedAccount<'info>,
+    receiver: &Signer<'info>,
     token_program: &Program<'info, Token>,
     amount: u64,
 ) -> Result<()> {
     let mut crs_amount = ONE_USDC;
-    if amount > ONE_USDC {
-        crs_amount = amount
-            .checked_mul(TEN_PERCENT)
-            .ok_or(NinaError::ArithmeticError)?
-            .checked_div(BASIS_POINTS)
-            .ok_or(NinaError::ArithmeticError)?
-    }
+    // if amount > ONE_USDC {
+    //     crs_amount = amount
+    //         .checked_mul(TEN_PERCENT)
+    //         .ok_or(NinaError::ArithmeticError)?
+    //         .checked_div(BASIS_POINTS)
+    //         .ok_or(NinaError::ArithmeticError)?
+    // }
 
     let cpi_accounts = Transfer {
         from: payment_token_account.to_account_info(),

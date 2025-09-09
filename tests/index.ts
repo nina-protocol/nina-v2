@@ -26,6 +26,7 @@ import { expect } from "chai";
 const TOKEN_2022_PROGRAM_ID = new anchor.web3.PublicKey(
   "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
 );
+const CRS_FEE = 10_000_000;
 
 const program = anchor.workspace.NinaV2 as Program<NinaV2>;
 const lightConnection = new anchor.web3.Connection('http://127.0.0.1:8899');
@@ -58,7 +59,7 @@ describe("nina-v2", () => {
   let purchaserAta: PublicKey;
   let payerAta: PublicKey;
   let ninaTreasuryAta: PublicKey;
-  let crsAccount = Keypair.generate();
+  let crsAccount = new PublicKey("crsNECAdnFS1dUM136E13AuARA5XPCBqAy2gTzyp7dv");
   let crsTokenAccount: PublicKey;
 
   it("setup accounts", async () => {
@@ -129,7 +130,7 @@ describe("nina-v2", () => {
       lightConnection,
       payer,
       paymentMint.publicKey,
-      crsAccount.publicKey,
+      crsAccount,
       null,
       TOKEN_PROGRAM_ID,
       ASSOCIATED_PROGRAM_ID
@@ -184,7 +185,7 @@ describe("nina-v2", () => {
   it("Initialize A Release for publisher without paymentMint ATA", async () => {
     const balanceBefore = await lightConnection.getBalance(payer.publicKey);
     console.log("Balance before", balanceBefore);
-
+    console.log('payer', payer.publicKey)
     const { release, txid } = await buildAndSendReleaseInitV2Transaction(
       program,
       payer,
@@ -222,7 +223,7 @@ describe("nina-v2", () => {
 
   it("Purchase a Release", async () => {
     const purchaserTokenBalanceBefore = await lightConnection.getTokenAccountBalance(purchaserAta, 'confirmed');
-
+    const crsBalanceBefore = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
     const [release] = await anchor.web3.PublicKey.findProgramAddress(
       [
         Buffer.from(anchor.utils.bytes.utf8.encode("nina-release")),
@@ -285,12 +286,12 @@ describe("nina-v2", () => {
     await new Promise((resolve) => setTimeout(resolve, 1000));
     console.log("txid", txid);
 
-    // const crsBalance = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
+    const crsBalance = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
 
     const purchaserTokenBalance = await lightConnection.getTokenAccountBalance(purchaserAta, 'confirmed');
     const royaltyTokenBalance = await lightConnection.getTokenAccountBalance(royaltyTokenAccount, 'confirmed');
-    expect(Number(purchaserTokenBalance.value.amount)).to.equal(Number(purchaserTokenBalanceBefore.value.amount) - (RELEASE_PRICE));
-    // expect(Number(crsBalance.value.amount)).to.equal(RELEASE_PRICE);
+    expect(Number(purchaserTokenBalance.value.amount)).to.equal(Number(purchaserTokenBalanceBefore.value.amount) - RELEASE_PRICE - CRS_FEE);
+    expect(Number(crsBalance.value.amount)).to.equal(Number(crsBalanceBefore.value.amount) + CRS_FEE);
     expect(Number(royaltyTokenBalance.value.amount)).to.equal(RELEASE_PRICE);
   });
 
@@ -334,7 +335,7 @@ describe("nina-v2", () => {
   it("Purchase a Release", async () => {
     await new Promise((resolve) => setTimeout(resolve, 5000));
     const purchaserTokenBalanceBefore = await lightConnection.getTokenAccountBalance(purchaserAta, 'finalized');
-    // const crsBalanceBefore = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'finalized');
+    const crsBalanceBefore = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'finalized');
     const royaltyTokenBalanceBefore = await lightConnection.getTokenAccountBalance(royaltyTokenAccount, 'finalized');
 
     const [release] = await anchor.web3.PublicKey.findProgramAddress(
@@ -365,7 +366,7 @@ describe("nina-v2", () => {
           owner: purchaser.publicKey,
           tokenProgramId: TOKEN_2022_PROGRAM_ID,
         }),
-        // crsTokenAccount,
+        crsTokenAccount,
         systemProgram: anchor.web3.SystemProgram.programId,
         associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
         tokenProgram: TOKEN_PROGRAM_ID,
@@ -392,7 +393,7 @@ describe("nina-v2", () => {
           owner: purchaser.publicKey,
           tokenProgramId: TOKEN_2022_PROGRAM_ID,
         }),
-        // crsTokenAccount,
+        crsTokenAccount,
         systemProgram: anchor.web3.SystemProgram.programId,
         associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
         tokenProgram: TOKEN_PROGRAM_ID,
@@ -423,21 +424,23 @@ describe("nina-v2", () => {
     await new Promise((resolve) => setTimeout(resolve, 5000));
     console.log("txid", txid);
 
-    // const crsBalance = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
+    const crsBalance = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
     // console.log("crsBalance", crsBalance);
     // expect(Number(crsBalance.value.amount)).to.equal(Number(crsBalanceBefore.value.amount) + (RELEASE_PRICE * 2));
 
     const purchaserTokenBalance = await lightConnection.getTokenAccountBalance(purchaserAta, 'confirmed');
-    expect(Number(purchaserTokenBalance.value.amount)).to.equal(Number(purchaserTokenBalanceBefore.value.amount) - (RELEASE_PRICE * 20));
+    expect(Number(purchaserTokenBalance.value.amount)).to.equal(Number(purchaserTokenBalanceBefore.value.amount) - (RELEASE_PRICE * 20) - CRS_FEE);
 
     const royaltyTokenBalance = await lightConnection.getTokenAccountBalance(royaltyTokenAccount, 'confirmed');
     expect(Number(royaltyTokenBalance.value.amount)).to.equal(Number(royaltyTokenBalanceBefore.value.amount) + (RELEASE_PRICE * 20));
+
+    expect(Number(crsBalance.value.amount)).to.equal(Number(crsBalanceBefore.value.amount) + CRS_FEE);
   });
 
   it("Initialize A Release and Purchase", async () => {
     await new Promise((resolve) => setTimeout(resolve, 5000));
     const purchaserTokenBalanceBefore = await lightConnection.getTokenAccountBalance(purchaserAta, 'confirmed');
-    // const crsBalanceBefore = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
+    const crsBalanceBefore = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
     const royaltyTokenBalanceBefore = royaltyTokenAccount ? await lightConnection.getTokenAccountBalance(royaltyTokenAccount, 'confirmed') : 0;
 
     const [release] = await anchor.web3.PublicKey.findProgramAddress(
@@ -500,7 +503,7 @@ describe("nina-v2", () => {
         owner: purchaser.publicKey,
         tokenProgramId: TOKEN_PROGRAM_ID,
       }),
-      // crsTokenAccount,
+      crsTokenAccount,
       systemProgram: anchor.web3.SystemProgram.programId,
       associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
       tokenProgram: TOKEN_PROGRAM_ID,
@@ -509,7 +512,8 @@ describe("nina-v2", () => {
     const ix = await program.methods
       .releaseInitAndPurchase(
         releaseSignerBump,
-        `https://arweave.net/rb9wx261pn2nCbiHtoqR2vQtZ3MRQ3qcyZeSSCE0Rm4`,
+        `rb9wx261pn2nCbiHtoqR2vQtZ3MRQ3qcyZeSSCE0Rm4`,
+        1,
         "Nina Test",
         "NINA",
         new anchor.BN(100),
@@ -560,12 +564,12 @@ describe("nina-v2", () => {
     await new Promise((resolve) => setTimeout(resolve, 1000));
     console.log("txid", txid);
 
-    // const crsBalance = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
+    const crsBalance = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
     // console.log("crsBalance", crsBalance);
-    // expect(Number(crsBalance.value.amount)).to.equal(Number(crsBalanceBefore.value.amount) + RELEASE_PRICE);
+    expect(Number(crsBalance.value.amount)).to.equal(Number(crsBalanceBefore.value.amount) + CRS_FEE);
 
     const purchaserTokenBalance = await lightConnection.getTokenAccountBalance(purchaserAta, 'confirmed');
-    expect(Number(purchaserTokenBalance.value.amount)).to.equal(Number(purchaserTokenBalanceBefore.value.amount) - (RELEASE_PRICE));
+    expect(Number(purchaserTokenBalance.value.amount)).to.equal(Number(purchaserTokenBalanceBefore.value.amount) - (RELEASE_PRICE) - CRS_FEE);
 
     const royaltyTokenBalance = await lightConnection.getTokenAccountBalance(royaltyTokenAccount, 'confirmed');
     expect(Number(royaltyTokenBalance.value.amount)).to.equal(Number(royaltyTokenBalanceBefore === 0 ? 0 : royaltyTokenBalanceBefore.value.amount) + RELEASE_PRICE);
@@ -574,7 +578,7 @@ describe("nina-v2", () => {
   it("Initialize A Release and Purchase And Close", async () => {
     await new Promise((resolve) => setTimeout(resolve, 5000));
     const purchaserTokenBalanceBefore = await lightConnection.getTokenAccountBalance(purchaserAta, 'confirmed');
-    // const crsBalanceBefore = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
+    const crsBalanceBefore = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
     const royaltyTokenBalanceBefore = royaltyTokenAccount ? await lightConnection.getTokenAccountBalance(royaltyTokenAccount, 'confirmed') : 0;
 
     const [release] = await anchor.web3.PublicKey.findProgramAddress(
@@ -637,7 +641,7 @@ describe("nina-v2", () => {
         owner: purchaser.publicKey,
         tokenProgramId: TOKEN_PROGRAM_ID,
       }),
-      // crsTokenAccount,
+      crsTokenAccount,
       systemProgram: anchor.web3.SystemProgram.programId,
       associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
       tokenProgram: TOKEN_PROGRAM_ID,
@@ -646,7 +650,8 @@ describe("nina-v2", () => {
     const ix = await program.methods
       .releaseInitAndPurchase(
         releaseSignerBump,
-        `https://arweave.net/rb9wx261pn2nCbiHtoqR2vQtZ3MRQ3qcyZeSSCE0Rm4`,
+        `rb9wx261pn2nCbiHtoqR2vQtZ3MRQ3qcyZeSSCE0Rm4`,
+        1,
         "Nina Test",
         "NINA",
         new anchor.BN(100),
@@ -697,12 +702,12 @@ describe("nina-v2", () => {
     await new Promise((resolve) => setTimeout(resolve, 1000));
     console.log("txid", txid);
 
-    // const crsBalance = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
+    const crsBalance = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
     // console.log("crsBalance", crsBalance);
-    // expect(Number(crsBalance.value.amount)).to.equal(Number(crsBalanceBefore.value.amount) + RELEASE_PRICE);
+    expect(Number(crsBalance.value.amount)).to.equal(Number(crsBalanceBefore.value.amount) + CRS_FEE);
 
     const purchaserTokenBalance = await lightConnection.getTokenAccountBalance(purchaserAta, 'confirmed');
-    expect(Number(purchaserTokenBalance.value.amount)).to.equal(Number(purchaserTokenBalanceBefore.value.amount) - (RELEASE_PRICE));
+    expect(Number(purchaserTokenBalance.value.amount)).to.equal(Number(purchaserTokenBalanceBefore.value.amount) - (RELEASE_PRICE) - CRS_FEE);
 
     const royaltyTokenBalance = await lightConnection.getTokenAccountBalance(royaltyTokenAccount, 'confirmed');
     expect(Number(royaltyTokenBalance.value.amount)).to.equal(Number(royaltyTokenBalanceBefore === 0 ? 0 : royaltyTokenBalanceBefore.value.amount) + RELEASE_PRICE);
@@ -760,7 +765,8 @@ describe("nina-v2", () => {
       );
     const ix = await program.methods
       .releaseUpdate(
-        `https://arweave.net/ZIdtfNs7XKWlIz3_n1CnfYhKNHlWgnHyM7SfNXrZ1aQ`,
+        `ZIdtfNs7XKWlIz3_n1CnfYhKNHlWgnHyM7SfNXrZ1aQ`,
+        1,
         "Nina Test2",
         "NINA2",  
         releaseSignerBump,
@@ -864,7 +870,8 @@ const buildAndSendReleaseInitV2Transaction = async (
 
   const ix = await program.methods
     .releaseInitV2(
-      `https://arweave.net/rb9wx261pn2nCbiHtoqR2vQtZ3MRQ3qcyZeSSCE0Rm4`,
+      `rb9wx261pn2nCbiHtoqR2vQtZ3MRQ3qcyZeSSCE0Rm4`,
+      1,
       "Nina Test",
       "NINA",
       new anchor.BN(100),

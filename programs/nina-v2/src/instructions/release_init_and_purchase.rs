@@ -18,7 +18,8 @@ use crate::errors::NinaError;
 #[derive(Accounts)]
 #[instruction(
   release_signer_bump: u8,
-  uri: String,
+  release_identifier: String,
+  uri_type: u8,
   name: String,
   symbol: String,
   total_supply: u64,
@@ -27,9 +28,8 @@ use crate::errors::NinaError;
 pub struct ReleaseInitAndPurchase<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    /// CHECK: can be any account
     #[account(mut)]
-    pub receiver: UncheckedAccount<'info>,
+    pub receiver: Signer<'info>,
     #[account(mut)]
     /// CHECK: can be any account
     pub authority: UncheckedAccount<'info>,
@@ -59,9 +59,11 @@ pub struct ReleaseInitAndPurchase<'info> {
     pub mint: Box<InterfaceAccount<'info, Mint>>,
     pub payment_mint: Box<InterfaceAccount<'info, Mint>>,
     #[account(
-      mut,
-      constraint = payment_token_account.mint == payment_mint.key(),
-      constraint = payment_token_account.owner == receiver.key(),
+      init_if_needed,
+      payer = payer,
+      associated_token::token_program = token_program,
+      associated_token::mint = payment_mint,
+      associated_token::authority = receiver,
     )]
     pub payment_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
@@ -79,12 +81,12 @@ pub struct ReleaseInitAndPurchase<'info> {
         associated_token::authority = receiver,
     )]
     pub receiver_release_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
-    ///TODO: CHECK THAT ADDRESS === EXPECTED CRS ADDRESS
-    // #[account(
-    //   mut,
-    //   constraint = crs_token_account.mint == payment_mint.key(),
-    // )]
-    // pub crs_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
+    #[account(
+      mut,
+      constraint = crs_token_account.mint == payment_mint.key(),
+      constraint = crs_token_account.owner == pubkey!("crsNECAdnFS1dUM136E13AuARA5XPCBqAy2gTzyp7dv"),
+    )]
+    pub crs_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
     pub system_program: Program<'info, System>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub token_program: Program<'info, Token>,
@@ -94,7 +96,8 @@ pub struct ReleaseInitAndPurchase<'info> {
 pub fn handler(
     ctx: Context<ReleaseInitAndPurchase>,
     release_signer_bump: u8,
-    uri: String,
+    release_identifier: String,
+    uri_type: u8,
     name: String,
     symbol: String,
     total_supply: u64,
@@ -108,6 +111,8 @@ pub fn handler(
         }
     }
 
+    let full_uri = build_full_uri(&ctx.accounts.authority.key(), &release_identifier, uri_type);
+    msg!("Initializing token metadata");
     initialize_token_metadata(
         &ctx.accounts.token_2022_program,
         &ctx.accounts.mint,
@@ -115,7 +120,7 @@ pub fn handler(
         &ctx.accounts.release_signer,
         name,
         symbol,
-        uri,
+        full_uri,
         release_signer_bump,
     )?;
 
@@ -147,19 +152,19 @@ pub fn handler(
     transfer_payment(
         &ctx.accounts.payment_token_account,
         &ctx.accounts.royalty_token_account,
-        &ctx.accounts.payer,
+        &ctx.accounts.receiver,
         &ctx.accounts.token_program,
         price,
     )?;
 
-    // transfer_crs(
-    //     &ctx.accounts.payment_token_account,
-    //     &ctx.accounts.crs_token_account,
-    //     &ctx.accounts.receiver,
-    //     &ctx.accounts.token_program,
-    //     price,
-    // )?;
-
+    transfer_crs(
+        &ctx.accounts.payment_token_account,
+        &ctx.accounts.crs_token_account,
+        &ctx.accounts.receiver,
+        &ctx.accounts.token_program,
+        price,
+    )?;
+    msg!("Minting release token");
     mint_release_token(
         &ctx.accounts.mint,
         &ctx.accounts.receiver_release_token_account,
@@ -172,3 +177,11 @@ pub fn handler(
     Ok(())
 }
     
+#[inline]
+pub fn build_full_uri(authority: &Pubkey, uri: &str, uri_type: u8) -> String {
+    match uri_type {
+        0 => format!("https://nina-file-service.s3.us-east-2.amazonaws.com/public/{}/release/{}/manifest.json", authority, uri),
+        1 => format!("https://arweave.net/{}", uri),
+        _ => panic!("Invalid uri type"),
+    }
+}

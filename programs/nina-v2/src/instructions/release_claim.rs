@@ -13,10 +13,9 @@ use anchor_spl::{
 use crate::state::ReleaseV2;
 use crate::errors::NinaError;
 use crate::utils::id_account_key;
+use crate::instructions::release_purchase::{validate_purchase, transfer_crs, mint_release_token};
 
-const BASIS_POINTS: u64 = 1_000_000;
 const ONE_USDC: u64 = 10_000_000;
-const TEN_PERCENT: u64 = 100_000;
 
 #[derive(Accounts)]
 #[instruction(
@@ -26,9 +25,8 @@ const TEN_PERCENT: u64 = 100_000;
 pub struct ReleaseClaim<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    /// CHECK: can be any account
     #[account(mut)]
-    pub receiver: UncheckedAccount<'info>,
+    pub receiver: Signer<'info>,
     #[account(
         seeds = [b"nina-release", mint.key().as_ref()],
         bump,
@@ -69,12 +67,12 @@ pub struct ReleaseClaim<'info> {
         associated_token::authority = receiver,
     )]
     pub receiver_release_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
-    ///TODO: CHECK THAT ADDRESS === EXPECTED CRS ADDRESS
-    // #[account(
-    //   mut,
-    //   constraint = crs_token_account.mint == release.payment_mint,
-    // )]
-    // pub crs_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
+    #[account(
+      mut,
+      constraint = crs_token_account.mint == release.payment_mint,
+      constraint = crs_token_account.owner == pubkey!("crsNECAdnFS1dUM136E13AuARA5XPCBqAy2gTzyp7dv"),
+    )]
+    pub crs_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
     pub system_program: Program<'info, System>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub token_program: Program<'info, Token>,
@@ -100,6 +98,14 @@ pub fn handler<'c: 'info, 'info>(
 
     validate_purchase(&ctx.accounts.release, &ctx.accounts.mint, amount)?;
             
+    transfer_crs(
+        &ctx.accounts.payment_token_account,
+        &ctx.accounts.crs_token_account,
+        &ctx.accounts.receiver,
+        &ctx.accounts.token_program,
+        ONE_USDC,
+    )?;
+
     mint_release_token(
         &ctx.accounts.mint,
         &ctx.accounts.receiver_release_token_account,
@@ -110,49 +116,4 @@ pub fn handler<'c: 'info, 'info>(
     )?;
     
     Ok(())
-}
-
-pub fn validate_purchase<'info>(
-    release: &Account<'info, ReleaseV2>,
-    mint: &InterfaceAccount<'info, Mint>,
-    amount: u64,
-) -> Result<()> {
-    if amount != release.price {
-        return Err(error!(NinaError::ReleasePurchaseWrongAmount));
-    }
-
-    if mint.supply >= release.total_supply {
-        return Err(error!(NinaError::ReleasePurchaseSoldOut));
-    }
-
-    Ok(())
-}
-
-pub fn mint_release_token<'info>(
-    mint: &InterfaceAccount<'info, Mint>,
-    receiver_release_token_account: &InterfaceAccount<'info, TokenAccount>,
-    release_signer: &UncheckedAccount<'info>,
-    release: &Account<'info, ReleaseV2>,
-    token_2022_program: &Program<'info, Token2022>,
-    release_signer_bump: u8,
-) -> Result<()> {
-    let cpi_accounts_mint_to = MintTo {
-        mint: mint.to_account_info(),
-        to: receiver_release_token_account.to_account_info(),
-        authority: release_signer.to_account_info(),
-    };
-
-    let seeds = &[
-        release.to_account_info().key.as_ref(),
-        &[release_signer_bump],
-    ];
-    let signer = &[&seeds[..]];
-    
-    let cpi_ctx_mint_to = CpiContext::new_with_signer(
-        token_2022_program.to_account_info(),
-        cpi_accounts_mint_to,
-        signer
-    );
-    
-    mint_to(cpi_ctx_mint_to, 1)
 }

@@ -35,10 +35,11 @@ use crate::{
 use crate::state::ReleaseV2;
 use crate::utils::file_service_account_key;
 use crate::errors::NinaError;
-
+use crate::instructions::release_init_and_purchase::build_full_uri;
 #[derive(AnchorDeserialize, AnchorSerialize)]
 pub struct ReleaseInitV2Args {
-    pub uri: String,
+    pub release_identifier: String,
+    pub uri_type: u8,
     pub name: String,
     pub symbol: String,
     pub total_supply: u64,
@@ -47,7 +48,7 @@ pub struct ReleaseInitV2Args {
 }
 
 #[derive(Accounts)]
-#[instruction(uri: String, name: String, symbol: String, total_supply: u64, price: u64, release_signer_bump: u8)]
+#[instruction(release_identifier: String, uri_type: u8, name: String, symbol: String, total_supply: u64, price: u64, release_signer_bump: u8)]
 pub struct ReleaseInitV2<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -156,7 +157,8 @@ pub fn set_release_data<'info>(
 
 pub fn handler(
     ctx: Context<ReleaseInitV2>,
-    uri: String,
+    release_identifier: String,
+    uri_type: u8,
     name: String,
     symbol: String,
     total_supply: u64,
@@ -170,6 +172,8 @@ pub fn handler(
         }
     }
 
+    let full_uri = build_full_uri(&ctx.accounts.authority.key(), &release_identifier, uri_type);
+
     initialize_token_metadata(
         &ctx.accounts.token_2022_program,
         &ctx.accounts.mint,
@@ -177,7 +181,7 @@ pub fn handler(
         &ctx.accounts.release_signer,
         name,
         symbol,
-        uri,
+        full_uri,
         release_signer_bump,
     )?;
     
