@@ -37,7 +37,7 @@ pub struct ReleaseInitAndPurchase<'info> {
         init,
         seeds = [b"nina-release", mint.key.as_ref()],
         bump,
-        payer = payer,
+        payer = receiver,
         space = 232,
     )]
     pub release: Account<'info, ReleaseV2>,
@@ -49,7 +49,7 @@ pub struct ReleaseInitAndPurchase<'info> {
     pub release_signer: UncheckedAccount<'info>,
     #[account(
         init,
-        payer = payer,
+        payer = receiver,
         mint::token_program = token_2022_program,
         mint::decimals = 0,
         mint::authority = release_signer,
@@ -81,12 +81,6 @@ pub struct ReleaseInitAndPurchase<'info> {
         associated_token::authority = receiver,
     )]
     pub receiver_release_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
-    #[account(
-      mut,
-      constraint = crs_token_account.mint == payment_mint.key(),
-      constraint = crs_token_account.owner == pubkey!("crsNECAdnFS1dUM136E13AuARA5XPCBqAy2gTzyp7dv"),
-    )]
-    pub crs_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
     pub system_program: Program<'info, System>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub token_program: Program<'info, Token>,
@@ -157,13 +151,6 @@ pub fn handler(
         price,
     )?;
 
-    transfer_crs(
-        &ctx.accounts.payment_token_account,
-        &ctx.accounts.crs_token_account,
-        &ctx.accounts.receiver,
-        &ctx.accounts.token_program,
-        price,
-    )?;
     msg!("Minting release token");
     mint_release_token(
         &ctx.accounts.mint,
