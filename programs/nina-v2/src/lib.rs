@@ -71,6 +71,19 @@ pub mod nina_v2 {
         )
     }
 
+    pub fn release_init_and_purchase_free<'c: 'info, 'info>(
+        ctx: Context<'_, '_, 'c, 'info, ReleaseInitAndPurchaseFree<'info>>,
+        release_signer_bump: u8,
+        release_identifier: String,
+        uri_type: u8,
+        name: String,
+        symbol: String,
+        total_supply: u64,
+        price: u64,
+    ) -> Result<()> {
+        instructions::release_init_and_purchase_free::handler(ctx, release_signer_bump, release_identifier, uri_type, name, symbol, total_supply, price)
+    }
+
     pub fn release_update<'c: 'info, 'info>(
         ctx: Context<'_, '_, 'c, 'info, ReleaseUpdate<'info>>,
         uri: String,
