@@ -33,11 +33,13 @@ pub mod nina_v2 {
         ctx: Context<'_, '_, 'c, 'info, ReleasePurchase<'info>>,
         amount: u64,
         release_signer_bump: u8,
+        bypass_crs: bool,
     ) -> Result<()> {
         instructions::release_purchase::handler(
             ctx,
             amount,
             release_signer_bump,
+            bypass_crs,
         )
     }
 

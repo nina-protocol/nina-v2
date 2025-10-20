@@ -25,8 +25,8 @@ const ONE_USDC: u64 = 10_000_000;
 pub struct ReleaseClaim<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    #[account(mut)]
-    pub receiver: Signer<'info>,
+    /// CHECK: can be any account
+    pub receiver: UncheckedAccount<'info>,
     #[account(
         seeds = [b"nina-release", mint.key().as_ref()],
         bump,
@@ -67,12 +67,6 @@ pub struct ReleaseClaim<'info> {
         associated_token::authority = receiver,
     )]
     pub receiver_release_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
-    #[account(
-      mut,
-      constraint = crs_token_account.mint == release.payment_mint,
-      constraint = crs_token_account.owner == pubkey!("crsNECAdnFS1dUM136E13AuARA5XPCBqAy2gTzyp7dv"),
-    )]
-    pub crs_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
     pub system_program: Program<'info, System>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub token_program: Program<'info, Token>,
@@ -98,14 +92,6 @@ pub fn handler<'c: 'info, 'info>(
 
     validate_purchase(&ctx.accounts.release, &ctx.accounts.mint, amount)?;
             
-    transfer_crs(
-        &ctx.accounts.payment_token_account,
-        &ctx.accounts.crs_token_account,
-        &ctx.accounts.receiver,
-        &ctx.accounts.token_program,
-        ONE_USDC,
-    )?;
-
     mint_release_token(
         &ctx.accounts.mint,
         &ctx.accounts.receiver_release_token_account,

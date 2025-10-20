@@ -22,6 +22,7 @@ const TEN_PERCENT: u64 = 100_000;
 #[instruction(
   amount: u64,
   release_signer_bump: u8,
+  bypass_crs: bool,
 )]
 pub struct ReleasePurchase<'info> {
     #[account(mut)]
@@ -85,6 +86,7 @@ pub fn handler<'c: 'info, 'info>(
     ctx: Context<'_, '_, 'c, 'info, ReleasePurchase<'info>>,
     amount: u64,
     release_signer_bump: u8,
+    bypass_crs: bool,
 ) -> Result<()> {
     if ctx.accounts.payer.key() != ctx.accounts.receiver.key() {
         #[cfg(feature = "is-test")]
@@ -103,13 +105,15 @@ pub fn handler<'c: 'info, 'info>(
         amount,
     )?;
     
-    transfer_crs(
-        &ctx.accounts.payment_token_account,
-        &ctx.accounts.crs_token_account,
-        &ctx.accounts.receiver,
-        &ctx.accounts.token_program,
-        amount,
-    )?;
+    if bypass_crs == false {
+        transfer_crs(
+            &ctx.accounts.payment_token_account,
+            &ctx.accounts.crs_token_account,
+            &ctx.accounts.receiver,
+            &ctx.accounts.token_program,
+            amount,
+        )?;
+    }
     
     mint_release_token(
         &ctx.accounts.mint,

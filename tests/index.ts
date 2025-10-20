@@ -46,7 +46,6 @@ const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({
 });
 
 describe("nina-v2", () => {
-
   const artist = Keypair.generate();
   const payer = Keypair.generate();
   const mint = Keypair.generate();
@@ -814,6 +813,7 @@ describe("nina-v2", () => {
     expect(Number(releaseData.totalSupply)).to.equal(1000);
   });
 });
+
 
 const buildAndSendReleaseInitV2Transaction = async (
   program: Program<NinaV2>,
