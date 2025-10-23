@@ -12,8 +12,8 @@
         "@coral-xyz/anchor": "0.31.0",
         "@lightprotocol/stateless.js": "^0.20.0",
         "@solana/spl-token": "^0.4.9",
-        "borsh": "2.0.0"
-
+        "borsh": "2.0.0",
+        "@nina-protocol/js-sdk-dev": "../js-sdk"
     },
     "devDependencies": {
         "@types/bn.js": "^5.1.0",

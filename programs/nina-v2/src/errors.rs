@@ -20,4 +20,6 @@ pub enum NinaError {
     InvalidCloseAuthority,
     #[msg("Invalid Transfer Authority")]
     InvalidTransferAuthority,
+    #[msg("Invalid Account Data")]
+    InvalidAccountData,
 }

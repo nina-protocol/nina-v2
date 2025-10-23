@@ -9,6 +9,7 @@ use anchor_spl::{
     },
     token_2022::{MintTo, mint_to},
 };
+use anchor_spl::token_interface as splti;
 
 use crate::state::ReleaseV2;
 use crate::errors::NinaError;
@@ -65,7 +66,7 @@ pub struct ReleasePurchase<'info> {
     #[account(
         init_if_needed,
         payer = payer,
-        associated_token::token_program = token_2022_program,
+        associated_token::token_program = token_program_release_mint,
         associated_token::mint = mint,
         associated_token::authority = receiver,
     )]
@@ -78,8 +79,8 @@ pub struct ReleasePurchase<'info> {
     pub crs_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
     pub system_program: Program<'info, System>,
     pub associated_token_program: Program<'info, AssociatedToken>,
-    pub token_program: Program<'info, Token>,
-    pub token_2022_program: Program<'info, Token2022>,
+    pub token_program_payment: Program<'info, Token>,
+    pub token_program_release_mint: Interface<'info, TokenInterface>,
 }
 
 pub fn handler<'c: 'info, 'info>(
@@ -101,7 +102,7 @@ pub fn handler<'c: 'info, 'info>(
         &ctx.accounts.payment_token_account,
         &ctx.accounts.royalty_token_account,
         &ctx.accounts.receiver,
-        &ctx.accounts.token_program,
+        &ctx.accounts.token_program_payment,
         amount,
     )?;
     
@@ -110,7 +111,7 @@ pub fn handler<'c: 'info, 'info>(
             &ctx.accounts.payment_token_account,
             &ctx.accounts.crs_token_account,
             &ctx.accounts.receiver,
-            &ctx.accounts.token_program,
+            &ctx.accounts.token_program_payment,
             amount,
         )?;
     }
@@ -120,7 +121,7 @@ pub fn handler<'c: 'info, 'info>(
         &ctx.accounts.receiver_release_token_account,
         &ctx.accounts.release_signer,
         &ctx.accounts.release,
-        &ctx.accounts.token_2022_program,
+        &ctx.accounts.token_program_release_mint,
         release_signer_bump,
     )?;
     
@@ -169,10 +170,10 @@ pub fn mint_release_token<'info>(
     receiver_release_token_account: &InterfaceAccount<'info, TokenAccount>,
     release_signer: &UncheckedAccount<'info>,
     release: &Account<'info, ReleaseV2>,
-    token_2022_program: &Program<'info, Token2022>,
+    token_program_release_mint: &Interface<'info, TokenInterface>,
     release_signer_bump: u8,
 ) -> Result<()> {
-    let cpi_accounts_mint_to = MintTo {
+    let cpi_accounts_mint_to = splti::MintTo {
         mint: mint.to_account_info(),
         to: receiver_release_token_account.to_account_info(),
         authority: release_signer.to_account_info(),
@@ -185,7 +186,7 @@ pub fn mint_release_token<'info>(
     let signer = &[&seeds[..]];
     
     let cpi_ctx_mint_to = CpiContext::new_with_signer(
-        token_2022_program.to_account_info(),
+        token_program_release_mint.to_account_info(),
         cpi_accounts_mint_to,
         signer
     );

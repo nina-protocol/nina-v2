@@ -18,7 +18,6 @@ use solana_zk_token_sdk::zk_token_proof_instruction::Pod;
 use spl_tlv_account_resolution::{account::ExtraAccountMeta, state::ExtraAccountMetaList};
 use spl_type_length_value::variable_len_pack::VariableLenPack;
 use std::str::FromStr;
-
 pub const APPROVE_ACCOUNT_SEED: &[u8] = b"approve-account";
 pub const META_LIST_ACCOUNT_SEED: &[u8] = b"extra-account-metas";
 
@@ -70,3 +69,6 @@ pub fn id_account_key() -> Pubkey {
   Pubkey::from_str("BnhxwsrY5aaeMehsTRoJzX2X4w5sKMhMfBs2MCKUqMC").unwrap()
 }
 
+pub fn v1_pid() -> Pubkey {
+  Pubkey::from_str("77BKtqWTbTRxj5eZPuFbeXjx3qz4TTHoXRnpCejYWiQH").unwrap()
+}

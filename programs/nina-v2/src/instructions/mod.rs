@@ -5,7 +5,7 @@ pub mod release_init_and_purchase_free;
 pub mod release_update;
 pub mod release_close;
 pub mod release_claim;
-
+pub mod release_migrate_v1_to_v2;
 pub use release_init_v2::*;
 pub use release_purchase::*;
 pub use release_init_and_purchase::*;
@@ -13,3 +13,4 @@ pub use release_init_and_purchase_free::*;
 pub use release_update::*;
 pub use release_close::*;
 pub use release_claim::*;
+pub use release_migrate_v1_to_v2::*;

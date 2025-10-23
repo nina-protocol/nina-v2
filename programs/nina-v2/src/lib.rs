@@ -6,12 +6,14 @@ pub mod state;
 pub mod instructions;
 pub mod utils;
 pub mod errors;
+pub mod v1;
 
 pub use state::*;
 pub use instructions::*;
 pub use utils::*;
 pub use errors::*;
-  
+pub use v1::*;
+
 #[program]
 pub mod nina_v2 {
     use super::*;
@@ -102,5 +104,11 @@ pub mod nina_v2 {
         ctx: Context<'_, '_, 'c, 'info, ReleaseClose<'info>>,
     ) -> Result<()> {
         instructions::release_close::handler(ctx)
+    }
+
+    pub fn release_migrate_v1_to_v2<'c: 'info, 'info>(
+        ctx: Context<'_, '_, 'c, 'info, ReleaseMigrateV1ToV2<'info>>,
+    ) -> Result<()> {
+        instructions::release_migrate_v1_to_v2::handler(ctx)
     }
 }

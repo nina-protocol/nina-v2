@@ -1,9 +1,10 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { NinaV2 } from "../target/types/nina_v2";
-import { PublicKey, Keypair } from "@solana/web3.js";
+import { PublicKey, Keypair, Connection } from "@solana/web3.js";
 import { ASSOCIATED_PROGRAM_ID } from "@coral-xyz/anchor/dist/cjs/utils/token";
-
+import { createHash } from "crypto";
+import bs58 from "bs58"; // yarn add bs58
 import {
   createAssociatedTokenAccount,
   mintTo,
@@ -22,6 +23,7 @@ import {
   buildSignAndSendTransaction,
 } from "./helpers/index";
 import { expect } from "chai";
+import Nina from "@nina-protocol/js-sdk-dev"
 
 const TOKEN_2022_PROGRAM_ID = new anchor.web3.PublicKey(
   "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
@@ -29,7 +31,10 @@ const TOKEN_2022_PROGRAM_ID = new anchor.web3.PublicKey(
 const CRS_FEE = 10_000_000;
 
 const program = anchor.workspace.NinaV2 as Program<NinaV2>;
-const lightConnection = new anchor.web3.Connection('http://127.0.0.1:8899');
+const ninaV1ProgramId = new anchor.web3.PublicKey("77BKtqWTbTRxj5eZPuFbeXjx3qz4TTHoXRnpCejYWiQH");
+let ninaV1Idl: anchor.Idl;
+
+const lightConnection = new anchor.web3.Connection('https://nina.devnet.rpcpool.com/e8d44ffc-1d21-4d80-bff3-c92500006d7c');
 
 const provider = new anchor.AnchorProvider(lightConnection, anchor.Wallet.local(), anchor.AnchorProvider.defaultOptions());
 anchor.setProvider(provider);
@@ -38,28 +43,29 @@ const RELEASE_PRICE = 10000000;
 
 // Request more compute units
 const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({
-  units: 1000000,
+  units: 10000000,
 });
 
 const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({
   microLamports: 1,
 });
 
+const artist = Keypair.generate();
+const payer = Keypair.generate();
+const mint = Keypair.generate();
+const mint2 = Keypair.generate();
+const mint3 = Keypair.generate();
+const mint4 = Keypair.generate();
+const purchaser = Keypair.generate();
+const paymentMint = Keypair.generate();
+const ninaTreasury = Keypair.generate().publicKey;
+let purchaserAta: PublicKey;
+let payerAta: PublicKey;
+let ninaTreasuryAta: PublicKey;
+let crsAccount = new PublicKey("crsNECAdnFS1dUM136E13AuARA5XPCBqAy2gTzyp7dv");
+let crsTokenAccount: PublicKey;
+
 describe("nina-v2", () => {
-  const artist = Keypair.generate();
-  const payer = Keypair.generate();
-  const mint = Keypair.generate();
-  const mint2 = Keypair.generate();
-  const mint3 = Keypair.generate();
-  const mint4 = Keypair.generate();
-  const purchaser = Keypair.generate();
-  const paymentMint = Keypair.generate();
-  const ninaTreasury = Keypair.generate().publicKey;
-  let purchaserAta: PublicKey;
-  let payerAta: PublicKey;
-  let ninaTreasuryAta: PublicKey;
-  let crsAccount = new PublicKey("crsNECAdnFS1dUM136E13AuARA5XPCBqAy2gTzyp7dv");
-  let crsTokenAccount: PublicKey;
 
   it("setup accounts", async () => {
     console.log("before airdrop");
@@ -812,7 +818,118 @@ describe("nina-v2", () => {
     expect(Number(releaseData.price)).to.equal(RELEASE_PRICE * 5);
     expect(Number(releaseData.totalSupply)).to.equal(1000);
   });
+
 });
+
+
+describe("Migrate Release V1 to V2", () => {
+  it("Get all releases from V1", async () => {
+    const releases = await getReleasesFromV1();
+    expect(releases.length).to.be.greaterThan(0);
+    for (const release of releases) {
+      expect(release.programId).to.equal(ninaV1ProgramId.toString());
+    }
+  });
+
+  it("Get one release from V1", async() => {
+    const releases = await getReleasesFromV1(1, 0, 1);
+    expect(releases.length).to.equal(1);
+    expect(releases[0].programId).to.equal(ninaV1ProgramId.toString());
+  })
+
+  it.only("Migrate one release from V1 to V2", async() => {
+    const releases = await getReleasesFromV1(1, 0, 1);
+    const release = releases[0];
+    console.log('release', release);
+    
+    const authorityPublicKey = new anchor.web3.PublicKey(release.publisher);
+    const v1ReleasePublicKey = new anchor.web3.PublicKey(release.publicKey);
+    const releaseMintPublicKey = new anchor.web3.PublicKey(release.mint);
+    const releaseSignerPublicKey = new anchor.web3.PublicKey(release.accountData.release.releaseSigner);
+    const paymentMintPublicKey = new anchor.web3.PublicKey(release.accountData.release.paymentMint);
+    const royaltyTokenAccountPublicKey = new anchor.web3.PublicKey(release.accountData.release.royaltyTokenAccount);
+
+    const v2AuthorityTokenAccount = associatedAddress({
+      mint: paymentMintPublicKey,
+      owner: authorityPublicKey,
+    });
+
+    const [v2Release] = await anchor.web3.PublicKey.findProgramAddress(
+      [
+        Buffer.from(anchor.utils.bytes.utf8.encode("nina-release")),
+        releaseMintPublicKey.toBuffer(),
+      ],
+      program.programId
+    );
+    const [v2ReleaseSigner] =
+      anchor.web3.PublicKey.findProgramAddressSync(
+        [v2Release.toBuffer()],
+        program.programId
+      );
+    const metadataProgram = new anchor.web3.PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s')
+    const [metadata] = await anchor.web3.PublicKey.findProgramAddress(
+      [Buffer.from('metadata'), metadataProgram.toBuffer(), releaseMintPublicKey.toBuffer()],
+      metadataProgram,
+    );
+    console.log('release.accountData.release.revenueShareRecipients', release.accountData.release.revenueShareRecipients);
+    const remainingAccounts = release.accountData.release.revenueShareRecipients
+    .filter(
+      (r) =>
+        r.recipientAuthority !== anchor.web3.PublicKey.default.toString() &&
+        r.recipientTokenAccount !== anchor.web3.PublicKey.default.toString() &&
+        r.owed > 0
+    )
+    .map((r) => ({
+      pubkey: new anchor.web3.PublicKey(r.recipientTokenAccount),
+      isSigner: false,
+      isWritable: true,
+    }));
+
+    const ix = await program.methods
+      .releaseMigrateV1ToV2()
+      .accountsStrict({
+        payer: provider.wallet.publicKey,
+        authority: authorityPublicKey,
+        release: v1ReleasePublicKey,
+        releaseMint: releaseMintPublicKey,
+        releaseSigner: releaseSignerPublicKey,
+        paymentMint: paymentMintPublicKey,
+        royaltyTokenAccount: royaltyTokenAccountPublicKey,
+        v2Release,
+        v2ReleaseSigner,
+        v2AuthorityTokenAccount,
+        metadata,
+        metadataProgram,
+        associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: anchor.web3.SystemProgram.programId,
+        rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+        sysvarInstructions: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
+        v1Program: ninaV1ProgramId,
+    })
+      .remainingAccounts(remainingAccounts)
+      .instruction();
+    console.log('ix', ix);
+    const txid = await buildSignAndSendTransaction(
+      [modifyComputeUnits, addPriorityFee, ix],
+      provider.wallet.payer,
+      lightConnection,
+      [],
+    );
+    console.log("txid", txid);
+    // if (txid) {
+    //   const latestBlockHash = await lightConnection.getLatestBlockhash();
+    //   await lightConnection.confirmTransaction(
+    //     {
+    //       blockhash: latestBlockHash.blockhash,
+    //       lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
+    //       signature: txid,
+    //     },
+    //     'finalized',
+    //   );
+    // }
+  })
+})
 
 
 const buildAndSendReleaseInitV2Transaction = async (
@@ -926,4 +1043,40 @@ export function associatedAddress({
     [owner.toBuffer(), tokenProgramId.toBuffer(), mint.toBuffer()],
     ASSOCIATED_PROGRAM_ID
   )[0];
+}
+
+const getReleasesFromV1 = async (limit: number = 100, offset: number = 0, total: number = 0) => {
+  console.log('ninaV1ProgramId', ninaV1ProgramId.toString());
+  console.log('program.programId', program.programId.toString());
+  await Nina.init({
+    endpoint: 'http://ec2-18-224-24-103.us-east-2.compute.amazonaws.com:3001/v1',
+    rpcEndpoint: 'https://nina.devnet.rpcpool.com/e8d44ffc-1d21-4d80-bff3-c92500006d7c',
+    programId: ninaV1ProgramId,
+    programIdV2: program.programId,
+    cluster: 'devnet',
+    apiKey:'PREssKWpCxMwwpfkesHbMvuEV7jCgQS7vZeN5SJqgfB'
+  });
+  let allReleases = []
+  try {
+    while (allReleases.length <= total) {
+      const releaseAccounts = await Nina.Release.fetchAll({
+        limit,
+        offset: offset,
+        sort: 'asc'
+      }, true);
+      allReleases.push(...releaseAccounts.releases.filter(release => release.programId === ninaV1ProgramId.toString()));
+      if (limit > 1 &&total === 0) {
+        total = releaseAccounts.total;
+      }
+      if (allReleases.length >= total) {
+        break;
+      }
+      offset += 100;
+      console.log('allReleases', allReleases.length);
+    }
+  } catch (error) {
+    console.log('broke because of bad release');
+    console.log('error', error);
+  }
+  return allReleases;
 }
