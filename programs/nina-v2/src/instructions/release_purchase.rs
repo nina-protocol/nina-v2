@@ -6,11 +6,11 @@ use anchor_spl::{
         Token2022,
         Mint,
         TokenAccount,
+        TokenInterface,
     },
     token_2022::{MintTo, mint_to},
 };
 use anchor_spl::token_interface as splti;
-
 use crate::state::ReleaseV2;
 use crate::errors::NinaError;
 use crate::utils::id_account_key;
@@ -187,6 +187,36 @@ pub fn mint_release_token<'info>(
     
     let cpi_ctx_mint_to = CpiContext::new_with_signer(
         token_program_release_mint.to_account_info(),
+        cpi_accounts_mint_to,
+        signer
+    );
+    
+    mint_to(cpi_ctx_mint_to, 1)
+}
+
+
+pub fn mint_release_token_v2<'info>(
+    mint: &InterfaceAccount<'info, Mint>,
+    receiver_release_token_account: &InterfaceAccount<'info, TokenAccount>,
+    release_signer: &UncheckedAccount<'info>,
+    release: &Account<'info, ReleaseV2>,
+    token_2022_program: &Program<'info, Token2022>,
+    release_signer_bump: u8,
+) -> Result<()> {
+    let cpi_accounts_mint_to = MintTo {
+        mint: mint.to_account_info(),
+        to: receiver_release_token_account.to_account_info(),
+        authority: release_signer.to_account_info(),
+    };
+
+    let seeds = &[
+        release.to_account_info().key.as_ref(),
+        &[release_signer_bump],
+    ];
+    let signer = &[&seeds[..]];
+    
+    let cpi_ctx_mint_to = CpiContext::new_with_signer(
+        token_2022_program.to_account_info(),
         cpi_accounts_mint_to,
         signer
     );

@@ -6,6 +6,7 @@ use anchor_spl::{
         Token2022,
         Mint,
         TokenAccount,
+        TokenInterface,
     },
     token_2022::{MintTo, mint_to},
 };
@@ -62,7 +63,7 @@ pub struct ReleaseClaim<'info> {
     #[account(
         init_if_needed,
         payer = payer,
-        associated_token::token_program = token_2022_program,
+        associated_token::token_program = token_program_release_mint,
         associated_token::mint = mint,
         associated_token::authority = receiver,
     )]
@@ -70,7 +71,7 @@ pub struct ReleaseClaim<'info> {
     pub system_program: Program<'info, System>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub token_program: Program<'info, Token>,
-    pub token_2022_program: Program<'info, Token2022>,
+    pub token_program_release_mint: Interface<'info, TokenInterface>,
 }
 
 pub fn handler<'c: 'info, 'info>(
@@ -97,7 +98,7 @@ pub fn handler<'c: 'info, 'info>(
         &ctx.accounts.receiver_release_token_account,
         &ctx.accounts.release_signer,
         &ctx.accounts.release,
-        &ctx.accounts.token_2022_program,
+        &ctx.accounts.token_program_release_mint,
         release_signer_bump,
     )?;
     

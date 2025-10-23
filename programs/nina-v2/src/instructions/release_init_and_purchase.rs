@@ -13,7 +13,7 @@ use anchor_spl::{
 
 use crate::state::ReleaseV2;
 use crate::instructions::release_init_v2::{set_release_data, initialize_token_metadata, update_mint_balance};
-use crate::instructions::release_purchase::{validate_purchase, transfer_payment, transfer_crs, mint_release_token};
+use crate::instructions::release_purchase::{validate_purchase, transfer_payment, transfer_crs, mint_release_token, mint_release_token_v2};
 use crate::utils::file_service_account_key;
 use crate::errors::NinaError;
 
@@ -155,7 +155,7 @@ pub fn handler(
     )?;
 
     msg!("Minting release token");
-    mint_release_token(
+    mint_release_token_v2(
         &ctx.accounts.mint,
         &ctx.accounts.receiver_release_token_account,
         &ctx.accounts.release_signer,

@@ -111,4 +111,12 @@ pub mod nina_v2 {
     ) -> Result<()> {
         instructions::release_migrate_v1_to_v2::handler(ctx)
     }
+
+    pub fn release_update_metaplex<'c: 'info, 'info>(
+        ctx: Context<'_, '_, 'c, 'info, ReleaseUpdateMetaplex<'info>>,
+        metadata_data: ReleaseMetadataData,
+        release_signer_bump: u8,
+    ) -> Result<()> {
+        instructions::release_update_metaplex::handler(ctx, metadata_data, release_signer_bump)
+    }
 }
