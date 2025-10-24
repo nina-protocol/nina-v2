@@ -105,7 +105,7 @@ pub fn handler<'c: 'info, 'info>(
   set_release_data(
       &mut ctx.accounts.v2_release,
       &ctx.accounts.authority,
-      &ctx.accounts.release_signer,
+      &ctx.accounts.v2_release_signer,
       &ctx.accounts.release_mint,
       &ctx.accounts.v2_authority_token_account,
       &ctx.accounts.payment_mint,

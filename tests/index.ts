@@ -1,10 +1,9 @@
+import "dotenv/config.js";
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { NinaV2 } from "../target/types/nina_v2";
-import { PublicKey, Keypair, Connection } from "@solana/web3.js";
+import { PublicKey, Keypair } from "@solana/web3.js";
 import { ASSOCIATED_PROGRAM_ID } from "@coral-xyz/anchor/dist/cjs/utils/token";
-import { createHash } from "crypto";
-import bs58 from "bs58"; // yarn add bs58
 import {
   createAssociatedTokenAccount,
   mintTo,
@@ -18,26 +17,38 @@ import {
 import {
   ComputeBudgetProgram,
 } from "@solana/web3.js";
-
+import Knex from "knex";
 import {
   buildSignAndSendTransaction,
 } from "./helpers/index";
 import { expect } from "chai";
 import Nina from "@nina-protocol/js-sdk-dev"
 
+const knexConfig = {
+  client: 'postgresql',
+  connection: {
+    host:     process.env.POSTGRES_HOST,
+    database: process.env.POSTGRES_DATABASE,
+    user:     process.env.POSTGRES_USER,
+    password: process.env.POSTGRES_PASSWORD,
+  },
+}
+const db = Knex(knexConfig)
+  
 const TOKEN_2022_PROGRAM_ID = new anchor.web3.PublicKey(
   "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
 );
 const CRS_FEE = 10_000_000;
-
-const program = anchor.workspace.NinaV2 as Program<NinaV2>;
-const ninaV1ProgramId = new anchor.web3.PublicKey("77BKtqWTbTRxj5eZPuFbeXjx3qz4TTHoXRnpCejYWiQH");
-let ninaV1Idl: anchor.Idl;
+const MAX_U64 = new anchor.BN('ffffffffffffffff', 16);
 
 const lightConnection = new anchor.web3.Connection('https://nina.devnet.rpcpool.com/e8d44ffc-1d21-4d80-bff3-c92500006d7c');
-
 const provider = new anchor.AnchorProvider(lightConnection, anchor.Wallet.local(), anchor.AnchorProvider.defaultOptions());
 anchor.setProvider(provider);
+const program = anchor.workspace.NinaV2 as Program<NinaV2>;
+
+const ninaV1ProgramId = new anchor.web3.PublicKey("77BKtqWTbTRxj5eZPuFbeXjx3qz4TTHoXRnpCejYWiQH");
+
+
 let royaltyTokenAccount: PublicKey;
 const RELEASE_PRICE = 10000000;
 
@@ -64,6 +75,16 @@ let payerAta: PublicKey;
 let ninaTreasuryAta: PublicKey;
 let crsAccount = new PublicKey("crsNECAdnFS1dUM136E13AuARA5XPCBqAy2gTzyp7dv");
 let crsTokenAccount: PublicKey;
+
+before(async () => {
+  await Nina.init({
+    endpoint: 'http://ec2-18-224-24-103.us-east-2.compute.amazonaws.com:3001/v1',
+    rpcEndpoint: 'https://nina.devnet.rpcpool.com/e8d44ffc-1d21-4d80-bff3-c92500006d7c',
+    programId: ninaV1ProgramId,
+    programIdV2: program.programId,
+    cluster: 'devnet',
+  });
+});
 
 describe("nina-v2", () => {
 
@@ -822,7 +843,7 @@ describe("nina-v2", () => {
 });
 
 
-describe("Migrate Release V1 to V2", () => {
+describe("Migrate Release V1 to V2", async () => {
   it("Get all releases from V1", async () => {
     const releases = await getReleasesFromV1();
     expect(releases.length).to.be.greaterThan(0);
@@ -840,8 +861,7 @@ describe("Migrate Release V1 to V2", () => {
   it.only("Migrate one release from V1 to V2", async() => {
     const releases = await getReleasesFromV1(1, 0, 1);
     const release = releases[0];
-    console.log('release', release);
-    
+
     const authorityPublicKey = new anchor.web3.PublicKey(release.publisher);
     const v1ReleasePublicKey = new anchor.web3.PublicKey(release.publicKey);
     const releaseMintPublicKey = new anchor.web3.PublicKey(release.mint);
@@ -871,19 +891,19 @@ describe("Migrate Release V1 to V2", () => {
       [Buffer.from('metadata'), metadataProgram.toBuffer(), releaseMintPublicKey.toBuffer()],
       metadataProgram,
     );
-    console.log('release.accountData.release.revenueShareRecipients', release.accountData.release.revenueShareRecipients);
+
     const remainingAccounts = release.accountData.release.revenueShareRecipients
-    .filter(
-      (r) =>
-        r.recipientAuthority !== anchor.web3.PublicKey.default.toString() &&
-        r.recipientTokenAccount !== anchor.web3.PublicKey.default.toString() &&
-        r.owed > 0
-    )
-    .map((r) => ({
-      pubkey: new anchor.web3.PublicKey(r.recipientTokenAccount),
-      isSigner: false,
-      isWritable: true,
-    }));
+      .filter(
+        (r) =>
+          r.recipientAuthority !== anchor.web3.PublicKey.default.toString() &&
+          r.recipientTokenAccount !== anchor.web3.PublicKey.default.toString() &&
+          r.owed > 0
+      )
+      .map((r) => ({
+        pubkey: new anchor.web3.PublicKey(r.recipientTokenAccount),
+        isSigner: false,
+        isWritable: true,
+      }));
 
     const ix = await program.methods
       .releaseMigrateV1ToV2()
@@ -906,28 +926,50 @@ describe("Migrate Release V1 to V2", () => {
         rent: anchor.web3.SYSVAR_RENT_PUBKEY,
         sysvarInstructions: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
         v1Program: ninaV1ProgramId,
-    })
+      })
       .remainingAccounts(remainingAccounts)
       .instruction();
-    console.log('ix', ix);
-    const txid = await buildSignAndSendTransaction(
+
+      const txid = await buildSignAndSendTransaction(
       [modifyComputeUnits, addPriorityFee, ix],
       provider.wallet.payer,
       lightConnection,
       [],
     );
-    console.log("txid", txid);
-    // if (txid) {
-    //   const latestBlockHash = await lightConnection.getLatestBlockhash();
-    //   await lightConnection.confirmTransaction(
-    //     {
-    //       blockhash: latestBlockHash.blockhash,
-    //       lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
-    //       signature: txid,
-    //     },
-    //     'finalized',
-    //   );
-    // }
+    let tx;
+    if (txid) {
+      const latestBlockHash = await lightConnection.getLatestBlockhash();
+      tx = await lightConnection.confirmTransaction(
+        {
+          blockhash: latestBlockHash.blockhash,
+          lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
+          signature: txid,
+        },
+        'finalized',
+      );
+    }
+    expect(tx.value.error).to.be.undefined;
+
+    await db('releases').where('publicKey', v1ReleasePublicKey.toString()).update({
+      programId: program.programId.toString(),
+      solanaAddress: v2Release.toString(),
+      migratedFromV1: true,
+    });
+
+    const releaseAfterUpdate = await db('releases').where('publicKey', v1ReleasePublicKey.toString()).first();
+    expect(releaseAfterUpdate.programId).to.equal(program.programId.toString());
+    expect(releaseAfterUpdate.solanaAddress).to.equal(v2Release.toString());
+    expect(releaseAfterUpdate.migratedFromV1).to.be.true;
+
+    const v2ReleaseData = await program.account.releaseV2.fetch(v2Release);
+    expect(v2ReleaseData.authority.toString()).to.equal(authorityPublicKey.toString());
+    expect(v2ReleaseData.mint.toString()).to.equal(releaseMintPublicKey.toString());
+    expect(v2ReleaseData.releaseSigner.toString()).to.equal(v2ReleaseSigner.toString());
+    expect(v2ReleaseData.paymentMint.toString()).to.equal(paymentMintPublicKey.toString());
+    expect(v2ReleaseData.royaltyTokenAccount.toString()).to.equal(v2AuthorityTokenAccount.toString());
+    const expectedTotalSupply = release.accountData.release.totalSupply === -1 ? Number(MAX_U64) : release.accountData.release.totalSupply;
+    expect(Number(v2ReleaseData.totalSupply)).to.equal(expectedTotalSupply);
+    expect(Number(v2ReleaseData.price)).to.equal(Number(release.accountData.release.price));
   })
 })
 
@@ -1048,14 +1090,6 @@ export function associatedAddress({
 const getReleasesFromV1 = async (limit: number = 100, offset: number = 0, total: number = 0) => {
   console.log('ninaV1ProgramId', ninaV1ProgramId.toString());
   console.log('program.programId', program.programId.toString());
-  await Nina.init({
-    endpoint: 'http://ec2-18-224-24-103.us-east-2.compute.amazonaws.com:3001/v1',
-    rpcEndpoint: 'https://nina.devnet.rpcpool.com/e8d44ffc-1d21-4d80-bff3-c92500006d7c',
-    programId: ninaV1ProgramId,
-    programIdV2: program.programId,
-    cluster: 'devnet',
-    apiKey:'PREssKWpCxMwwpfkesHbMvuEV7jCgQS7vZeN5SJqgfB'
-  });
   let allReleases = []
   try {
     while (allReleases.length <= total) {
