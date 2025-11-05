@@ -16,7 +16,7 @@ use crate::errors::NinaError;
 use crate::utils::id_account_key;
 
 const BASIS_POINTS: u64 = 1_000_000;
-const ONE_USDC: u64 = 1_000_000;
+const ONE_USDC: u64 = 10_000_000;
 const TEN_PERCENT: u64 = 100_000;
 
 #[derive(Accounts)]
@@ -112,7 +112,7 @@ pub fn handler<'c: 'info, 'info>(
             &ctx.accounts.crs_token_account,
             &ctx.accounts.receiver,
             &ctx.accounts.token_program_payment,
-            amount,
+            ONE_USDC,
         )?;
     }
     

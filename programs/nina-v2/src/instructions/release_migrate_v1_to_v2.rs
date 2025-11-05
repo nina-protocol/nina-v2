@@ -48,6 +48,7 @@ pub struct ReleaseMigrateV1ToV2<'info> {
     /// CHECK: This is safe bc checked in cpi
     pub release_signer: UncheckedAccount<'info>,
     pub payment_mint: InterfaceAccount<'info, Mint>,
+    pub v1_payment_mint: InterfaceAccount<'info, Mint>,
     #[account(mut)]
     pub royalty_token_account: InterfaceAccount<'info, TokenAccount>,
     #[account(
@@ -170,7 +171,7 @@ pub fn release_migrate_handler<'c: 'info, 'info>(
         release:             ctx.accounts.release.clone(),
         release_mint:        ctx.accounts.release_mint.clone(),
         release_signer:      ctx.accounts.release_signer.clone(),
-        payment_mint:        ctx.accounts.payment_mint.clone(),
+        payment_mint:        ctx.accounts.v1_payment_mint.clone(),
         royalty_token_account: ctx.accounts.royalty_token_account.clone(),
         token_program:       ctx.accounts.token_program.clone(),
         system_program:      ctx.accounts.system_program.clone(),

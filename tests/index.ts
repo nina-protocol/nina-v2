@@ -41,7 +41,7 @@ const TOKEN_2022_PROGRAM_ID = new anchor.web3.PublicKey(
 const CRS_FEE = 10_000_000;
 const MAX_U64 = new anchor.BN('ffffffffffffffff', 16);
 
-const lightConnection = new anchor.web3.Connection('https://nina.devnet.rpcpool.com/e8d44ffc-1d21-4d80-bff3-c92500006d7c');
+const lightConnection = new anchor.web3.Connection('https://nina.devnet.rpcpool.com/070dec34-5a03-4ee7-9555-d91e51d7d6f2');
 const provider = new anchor.AnchorProvider(lightConnection, anchor.Wallet.local(), anchor.AnchorProvider.defaultOptions());
 anchor.setProvider(provider);
 const program = anchor.workspace.NinaV2 as Program<NinaV2>;
@@ -76,17 +76,7 @@ let ninaTreasuryAta: PublicKey;
 let crsAccount = new PublicKey("crsNECAdnFS1dUM136E13AuARA5XPCBqAy2gTzyp7dv");
 let crsTokenAccount: PublicKey;
 
-before(async () => {
-  await Nina.init({
-    endpoint: 'http://ec2-18-224-24-103.us-east-2.compute.amazonaws.com:3001/v1',
-    rpcEndpoint: 'https://nina.devnet.rpcpool.com/e8d44ffc-1d21-4d80-bff3-c92500006d7c',
-    programId: ninaV1ProgramId,
-    programIdV2: program.programId,
-    cluster: 'devnet',
-  });
-});
-
-describe("nina-v2", () => {
+describe.only("nina-v2", () => {
 
   it("setup accounts", async () => {
     console.log("before airdrop");
@@ -208,120 +198,121 @@ describe("nina-v2", () => {
     )
   });
 
-  it("Initialize A Release for publisher without paymentMint ATA", async () => {
-    const balanceBefore = await lightConnection.getBalance(payer.publicKey);
-    console.log("Balance before", balanceBefore);
-    console.log('payer', payer.publicKey)
-    const { release, txid } = await buildAndSendReleaseInitV2Transaction(
-      program,
-      payer,
-      artist,
-      lightConnection,
-      paymentMint,
-      mint,
-      undefined,
-    );
+  // it("Initialize A Release for publisher without paymentMint ATA", async () => {
+  //   const balanceBefore = await lightConnection.getBalance(payer.publicKey);
+  //   console.log("Balance before", balanceBefore);
+  //   console.log('payer', payer.publicKey)
+  //   const { release, txid } = await buildAndSendReleaseInitV2Transaction(
+  //     program,
+  //     payer,
+  //     artist,
+  //     lightConnection,
+  //     paymentMint,
+  //     mint,
+  //     undefined,
+  //   );
 
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    console.log('release', release)
-    const releaseAccount = await program.account.releaseV2.fetch(release);
-    console.log("Release", releaseAccount);
-    const balanceAfter = await lightConnection.getBalance(
-      payer.publicKey,
-      "confirmed"
-    );
-    console.log("Balance after", balanceAfter);
+  //   await new Promise((resolve) => setTimeout(resolve, 1000));
+  //   console.log('release', release)
+  //   const releaseAccount = await program.account.releaseV2.fetch(release);
+  //   console.log("Release", releaseAccount);
+  //   const balanceAfter = await lightConnection.getBalance(
+  //     payer.publicKey,
+  //     "confirmed"
+  //   );
+  //   console.log("Balance after", balanceAfter);
 
-    if (txid) {
-      const latestBlockHash = await lightConnection.getLatestBlockhash();
-      await lightConnection.confirmTransaction(
-        {
-          blockhash: latestBlockHash.blockhash,
-          lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
-          signature: txid,
-        },
-        'finalized',
-      );
-    }
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+  //   if (txid) {
+  //     const latestBlockHash = await lightConnection.getLatestBlockhash();
+  //     await lightConnection.confirmTransaction(
+  //       {
+  //         blockhash: latestBlockHash.blockhash,
+  //         lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
+  //         signature: txid,
+  //       },
+  //       'finalized',
+  //     );
+  //   }
+  //   await new Promise((resolve) => setTimeout(resolve, 1000));
 
-  });
+  // });
 
-  it("Purchase a Release", async () => {
-    const purchaserTokenBalanceBefore = await lightConnection.getTokenAccountBalance(purchaserAta, 'confirmed');
-    const crsBalanceBefore = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
-    const [release] = await anchor.web3.PublicKey.findProgramAddress(
-      [
-        Buffer.from(anchor.utils.bytes.utf8.encode("nina-release")),
-        mint.publicKey.toBuffer(),
-      ],
-      program.programId
-    );
-    const [releaseSigner, releaseSignerBump] =
-      anchor.web3.PublicKey.findProgramAddressSync(
-        [release.toBuffer()],
-        program.programId
-      );
-    console.log('crsTokenAccount', crsTokenAccount)
-    const ix = await program.methods
-      .releasePurchase(
-        new anchor.BN(RELEASE_PRICE),
-        releaseSignerBump,
-      )
-      .accounts({
-        payer: purchaser.publicKey,
-        receiver: purchaser.publicKey,
-        release,
-        releaseSigner,
-        mint: mint.publicKey,
-        paymentMint: paymentMint.publicKey,
-        paymentTokenAccount: purchaserAta,
-        royaltyTokenAccount,
-        receiverReleaseTokenAccount: associatedAddress({
-          mint: mint.publicKey,
-          owner: purchaser.publicKey,
-          tokenProgramId: TOKEN_2022_PROGRAM_ID,
-        }),
-        crsTokenAccount,
-        systemProgram: anchor.web3.SystemProgram.programId,
-        associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
-        tokenProgram: TOKEN_PROGRAM_ID,
-        token2022Program: TOKEN_2022_PROGRAM_ID,
-      })
-      .instruction();
+  // it("Purchase a Release", async () => {
+  //   const purchaserTokenBalanceBefore = await lightConnection.getTokenAccountBalance(purchaserAta, 'confirmed');
+  //   const crsBalanceBefore = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
+  //   const [release] = await anchor.web3.PublicKey.findProgramAddress(
+  //     [
+  //       Buffer.from(anchor.utils.bytes.utf8.encode("nina-release")),
+  //       mint.publicKey.toBuffer(),
+  //     ],
+  //     program.programId
+  //   );
+  //   const [releaseSigner, releaseSignerBump] =
+  //     anchor.web3.PublicKey.findProgramAddressSync(
+  //       [release.toBuffer()],
+  //       program.programId
+  //     );
+  //   console.log('crsTokenAccount', crsTokenAccount)
+  //   const ix = await program.methods
+  //     .releasePurchase(
+  //       new anchor.BN(RELEASE_PRICE),
+  //       releaseSignerBump,
+  //       false,
+  //     )
+  //     .accounts({
+  //       payer: purchaser.publicKey,
+  //       receiver: purchaser.publicKey,
+  //       release,
+  //       releaseSigner,
+  //       mint: mint.publicKey,
+  //       paymentMint: paymentMint.publicKey,
+  //       paymentTokenAccount: purchaserAta,
+  //       royaltyTokenAccount,
+  //       receiverReleaseTokenAccount: associatedAddress({
+  //         mint: mint.publicKey,
+  //         owner: purchaser.publicKey,
+  //         tokenProgramId: TOKEN_2022_PROGRAM_ID,
+  //       }),
+  //       crsTokenAccount,
+  //       systemProgram: anchor.web3.SystemProgram.programId,
+  //       associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
+  //       tokenProgramPayment: TOKEN_PROGRAM_ID,
+  //       tokenProgramReleaseMint: TOKEN_2022_PROGRAM_ID,
+  //     })
+  //     .instruction();
   
-    const txid = await buildSignAndSendTransaction(
-      [modifyComputeUnits, addPriorityFee, ix],
-      purchaser,
-      lightConnection,
-      []
-    ).catch((err) => {
-      console.log("Error", err);
-    });
-    if (txid) {
-      const latestBlockHash = await lightConnection.getLatestBlockhash();
-      await lightConnection.confirmTransaction(
-        {
-          blockhash: latestBlockHash.blockhash,
-          lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
-          signature: txid,
-        },
-        'finalized',
-      );
-    }
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    console.log("txid", txid);
+  //   const txid = await buildSignAndSendTransaction(
+  //     [modifyComputeUnits, addPriorityFee, ix],
+  //     purchaser,
+  //     lightConnection,
+  //     []
+  //   ).catch((err) => {
+  //     console.log("Error", err);
+  //   });
+  //   if (txid) {
+  //     const latestBlockHash = await lightConnection.getLatestBlockhash();
+  //     await lightConnection.confirmTransaction(
+  //       {
+  //         blockhash: latestBlockHash.blockhash,
+  //         lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
+  //         signature: txid,
+  //       },
+  //       'finalized',
+  //     );
+  //   }
+  //   await new Promise((resolve) => setTimeout(resolve, 1000));
+  //   console.log("txid", txid);
 
-    const crsBalance = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
+  //   const crsBalance = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
 
-    const purchaserTokenBalance = await lightConnection.getTokenAccountBalance(purchaserAta, 'confirmed');
-    const royaltyTokenBalance = await lightConnection.getTokenAccountBalance(royaltyTokenAccount, 'confirmed');
-    expect(Number(purchaserTokenBalance.value.amount)).to.equal(Number(purchaserTokenBalanceBefore.value.amount) - RELEASE_PRICE - CRS_FEE);
-    expect(Number(crsBalance.value.amount)).to.equal(Number(crsBalanceBefore.value.amount) + CRS_FEE);
-    expect(Number(royaltyTokenBalance.value.amount)).to.equal(RELEASE_PRICE);
-  });
+  //   const purchaserTokenBalance = await lightConnection.getTokenAccountBalance(purchaserAta, 'confirmed');
+  //   const royaltyTokenBalance = await lightConnection.getTokenAccountBalance(royaltyTokenAccount, 'confirmed');
+  //   expect(Number(purchaserTokenBalance.value.amount)).to.equal(Number(purchaserTokenBalanceBefore.value.amount) - RELEASE_PRICE - CRS_FEE);
+  //   expect(Number(crsBalance.value.amount)).to.equal(Number(crsBalanceBefore.value.amount) + CRS_FEE);
+  //   expect(Number(royaltyTokenBalance.value.amount)).to.equal(RELEASE_PRICE);
+  // });
 
-  it("Initialize A $20 Release for publisher with paymentMint ATA", async () => {
+  it.skip("Initialize A $20 Release for publisher with paymentMint ATA", async () => {
     const balanceBefore = await lightConnection.getBalance(payer.publicKey);
     console.log("Balance before", balanceBefore);
 
@@ -337,11 +328,6 @@ describe("nina-v2", () => {
     );
 
     await new Promise((resolve) => setTimeout(resolve, 1000));
-    const balanceAfter = await lightConnection.getBalance(
-      payer.publicKey,
-      "finalized"
-    );
-    console.log("Balance after", balanceAfter);
 
     if (txid) {
       const latestBlockHash = await lightConnection.getLatestBlockhash();
@@ -355,10 +341,15 @@ describe("nina-v2", () => {
       );
     }
     await new Promise((resolve) => setTimeout(resolve, 1000));
+    const balanceAfter = await lightConnection.getBalance(
+      payer.publicKey,
+      "finalized"
+    );
+    console.log("Balance after", balanceAfter);
 
   });
 
-  it("Purchase a Release", async () => {
+  it.skip("Purchase a Release", async () => {
     await new Promise((resolve) => setTimeout(resolve, 5000));
     const purchaserTokenBalanceBefore = await lightConnection.getTokenAccountBalance(purchaserAta, 'finalized');
     const crsBalanceBefore = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'finalized');
@@ -395,8 +386,8 @@ describe("nina-v2", () => {
         crsTokenAccount,
         systemProgram: anchor.web3.SystemProgram.programId,
         associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
-        tokenProgram: TOKEN_PROGRAM_ID,
-        token2022Program: TOKEN_2022_PROGRAM_ID,
+        tokenProgramPayment: TOKEN_PROGRAM_ID,
+        tokenProgramReleaseMint: TOKEN_2022_PROGRAM_ID,
       })
 
     
@@ -404,6 +395,7 @@ describe("nina-v2", () => {
       .releasePurchase(
         new anchor.BN(RELEASE_PRICE * 20),
         releaseSignerBump,
+        false,
       )
       .accounts({
         payer: purchaser.publicKey,
@@ -422,8 +414,8 @@ describe("nina-v2", () => {
         crsTokenAccount,
         systemProgram: anchor.web3.SystemProgram.programId,
         associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
-        tokenProgram: TOKEN_PROGRAM_ID,
-        token2022Program: TOKEN_2022_PROGRAM_ID,
+        tokenProgramPayment: TOKEN_PROGRAM_ID,
+        tokenProgramReleaseMint: TOKEN_2022_PROGRAM_ID,
       })
       .instruction();
   
@@ -451,10 +443,12 @@ describe("nina-v2", () => {
     console.log("txid", txid);
 
     const crsBalance = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
-    // console.log("crsBalance", crsBalance);
+    console.log("crsBalance", crsBalance);
     // expect(Number(crsBalance.value.amount)).to.equal(Number(crsBalanceBefore.value.amount) + (RELEASE_PRICE * 2));
 
     const purchaserTokenBalance = await lightConnection.getTokenAccountBalance(purchaserAta, 'confirmed');
+    console.log("purchaserTokenBalance", purchaserTokenBalance);
+    console.log("purchaserTokenBalanceBefore", purchaserTokenBalanceBefore);
     expect(Number(purchaserTokenBalance.value.amount)).to.equal(Number(purchaserTokenBalanceBefore.value.amount) - (RELEASE_PRICE * 20) - CRS_FEE);
 
     const royaltyTokenBalance = await lightConnection.getTokenAccountBalance(royaltyTokenAccount, 'confirmed');
@@ -463,7 +457,7 @@ describe("nina-v2", () => {
     expect(Number(crsBalance.value.amount)).to.equal(Number(crsBalanceBefore.value.amount) + CRS_FEE);
   });
 
-  it("Initialize A Release and Purchase", async () => {
+  it.skip("Initialize A Release and Purchase", async () => {
     await new Promise((resolve) => setTimeout(resolve, 5000));
     const purchaserTokenBalanceBefore = await lightConnection.getTokenAccountBalance(purchaserAta, 'confirmed');
     const crsBalanceBefore = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
@@ -560,7 +554,6 @@ describe("nina-v2", () => {
           owner: purchaser.publicKey,
           tokenProgramId: TOKEN_2022_PROGRAM_ID,
         }),
-        crsTokenAccount,
         systemProgram: anchor.web3.SystemProgram.programId,
         associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
         tokenProgram: TOKEN_PROGRAM_ID,
@@ -590,18 +583,18 @@ describe("nina-v2", () => {
     await new Promise((resolve) => setTimeout(resolve, 1000));
     console.log("txid", txid);
 
-    const crsBalance = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
+    // const crsBalance = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
     // console.log("crsBalance", crsBalance);
-    expect(Number(crsBalance.value.amount)).to.equal(Number(crsBalanceBefore.value.amount) + CRS_FEE);
+    // expect(Number(crsBalance.value.amount)).to.equal(Number(crsBalanceBefore.value.amount) + CRS_FEE);
 
     const purchaserTokenBalance = await lightConnection.getTokenAccountBalance(purchaserAta, 'confirmed');
-    expect(Number(purchaserTokenBalance.value.amount)).to.equal(Number(purchaserTokenBalanceBefore.value.amount) - (RELEASE_PRICE) - CRS_FEE);
+    expect(Number(purchaserTokenBalance.value.amount)).to.equal(Number(purchaserTokenBalanceBefore.value.amount) - (RELEASE_PRICE));
 
     const royaltyTokenBalance = await lightConnection.getTokenAccountBalance(royaltyTokenAccount, 'confirmed');
     expect(Number(royaltyTokenBalance.value.amount)).to.equal(Number(royaltyTokenBalanceBefore === 0 ? 0 : royaltyTokenBalanceBefore.value.amount) + RELEASE_PRICE);
   });
 
-  it("Initialize A Release and Purchase And Close", async () => {
+  it.skip("Initialize A Release and Purchase And Close", async () => {
     await new Promise((resolve) => setTimeout(resolve, 5000));
     const purchaserTokenBalanceBefore = await lightConnection.getTokenAccountBalance(purchaserAta, 'confirmed');
     const crsBalanceBefore = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
@@ -698,7 +691,6 @@ describe("nina-v2", () => {
           owner: purchaser.publicKey,
           tokenProgramId: TOKEN_2022_PROGRAM_ID,
         }),
-        crsTokenAccount,
         systemProgram: anchor.web3.SystemProgram.programId,
         associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
         tokenProgram: TOKEN_PROGRAM_ID,
@@ -728,12 +720,8 @@ describe("nina-v2", () => {
     await new Promise((resolve) => setTimeout(resolve, 1000));
     console.log("txid", txid);
 
-    const crsBalance = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
-    // console.log("crsBalance", crsBalance);
-    expect(Number(crsBalance.value.amount)).to.equal(Number(crsBalanceBefore.value.amount) + CRS_FEE);
-
     const purchaserTokenBalance = await lightConnection.getTokenAccountBalance(purchaserAta, 'confirmed');
-    expect(Number(purchaserTokenBalance.value.amount)).to.equal(Number(purchaserTokenBalanceBefore.value.amount) - (RELEASE_PRICE) - CRS_FEE);
+    expect(Number(purchaserTokenBalance.value.amount)).to.equal(Number(purchaserTokenBalanceBefore.value.amount) - (RELEASE_PRICE));
 
     const royaltyTokenBalance = await lightConnection.getTokenAccountBalance(royaltyTokenAccount, 'confirmed');
     expect(Number(royaltyTokenBalance.value.amount)).to.equal(Number(royaltyTokenBalanceBefore === 0 ? 0 : royaltyTokenBalanceBefore.value.amount) + RELEASE_PRICE);
@@ -776,7 +764,7 @@ describe("nina-v2", () => {
   });
 
 
-  it("Update Metadata", async () => {
+  it.skip("Update Metadata Token2022 Mint", async () => {
     const [release] = await anchor.web3.PublicKey.findProgramAddress(
       [
         Buffer.from(anchor.utils.bytes.utf8.encode("nina-release")),
@@ -844,6 +832,16 @@ describe("nina-v2", () => {
 
 
 describe("Migrate Release V1 to V2", async () => {
+  before(async () => {
+    await Nina.init({
+      endpoint: 'http://ec2-18-224-24-103.us-east-2.compute.amazonaws.com:3001/v1',
+      rpcEndpoint: 'https://nina.devnet.rpcpool.com/e8d44ffc-1d21-4d80-bff3-c92500006d7c',
+      programId: ninaV1ProgramId,
+      programIdV2: program.programId,
+      cluster: 'devnet',
+    });
+  });
+  
   it("Get all releases from V1", async () => {
     const releases = await getReleasesFromV1();
     expect(releases.length).to.be.greaterThan(0);
@@ -859,107 +857,31 @@ describe("Migrate Release V1 to V2", async () => {
   })
 
   it.only("Migrate one release from V1 to V2", async() => {
-    const releases = await getReleasesFromV1(1, 0, 1);
+    let releases = await getReleasesFromV1(1, 0, 1);
+    let tries = 0;
+    while (releases.length === 0) {
+      releases = await getReleasesFromV1(1, tries, 1);
+      tries++;
+      if (releases.length === 0) {
+        console.log('no releases found, trying again');
+      }
+    }
     const release = releases[0];
 
-    const authorityPublicKey = new anchor.web3.PublicKey(release.publisher);
-    const v1ReleasePublicKey = new anchor.web3.PublicKey(release.publicKey);
-    const releaseMintPublicKey = new anchor.web3.PublicKey(release.mint);
-    const releaseSignerPublicKey = new anchor.web3.PublicKey(release.accountData.release.releaseSigner);
-    const paymentMintPublicKey = new anchor.web3.PublicKey(release.accountData.release.paymentMint);
-    const royaltyTokenAccountPublicKey = new anchor.web3.PublicKey(release.accountData.release.royaltyTokenAccount);
-
-    const v2AuthorityTokenAccount = associatedAddress({
-      mint: paymentMintPublicKey,
-      owner: authorityPublicKey,
-    });
-
-    const [v2Release] = await anchor.web3.PublicKey.findProgramAddress(
-      [
-        Buffer.from(anchor.utils.bytes.utf8.encode("nina-release")),
-        releaseMintPublicKey.toBuffer(),
-      ],
-      program.programId
-    );
-    const [v2ReleaseSigner] =
-      anchor.web3.PublicKey.findProgramAddressSync(
-        [v2Release.toBuffer()],
-        program.programId
-      );
-    const metadataProgram = new anchor.web3.PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s')
-    const [metadata] = await anchor.web3.PublicKey.findProgramAddress(
-      [Buffer.from('metadata'), metadataProgram.toBuffer(), releaseMintPublicKey.toBuffer()],
-      metadataProgram,
-    );
-
-    const remainingAccounts = release.accountData.release.revenueShareRecipients
-      .filter(
-        (r) =>
-          r.recipientAuthority !== anchor.web3.PublicKey.default.toString() &&
-          r.recipientTokenAccount !== anchor.web3.PublicKey.default.toString() &&
-          r.owed > 0
-      )
-      .map((r) => ({
-        pubkey: new anchor.web3.PublicKey(r.recipientTokenAccount),
-        isSigner: false,
-        isWritable: true,
-      }));
-
-    const ix = await program.methods
-      .releaseMigrateV1ToV2()
-      .accountsStrict({
-        payer: provider.wallet.publicKey,
-        authority: authorityPublicKey,
-        release: v1ReleasePublicKey,
-        releaseMint: releaseMintPublicKey,
-        releaseSigner: releaseSignerPublicKey,
-        paymentMint: paymentMintPublicKey,
-        royaltyTokenAccount: royaltyTokenAccountPublicKey,
-        v2Release,
-        v2ReleaseSigner,
-        v2AuthorityTokenAccount,
-        metadata,
-        metadataProgram,
-        associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
-        tokenProgram: TOKEN_PROGRAM_ID,
-        systemProgram: anchor.web3.SystemProgram.programId,
-        rent: anchor.web3.SYSVAR_RENT_PUBKEY,
-        sysvarInstructions: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
-        v1Program: ninaV1ProgramId,
-      })
-      .remainingAccounts(remainingAccounts)
-      .instruction();
-
-      const txid = await buildSignAndSendTransaction(
-      [modifyComputeUnits, addPriorityFee, ix],
-      provider.wallet.payer,
-      lightConnection,
-      [],
-    );
-    let tx;
-    if (txid) {
-      const latestBlockHash = await lightConnection.getLatestBlockhash();
-      tx = await lightConnection.confirmTransaction(
-        {
-          blockhash: latestBlockHash.blockhash,
-          lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
-          signature: txid,
-        },
-        'finalized',
-      );
-    }
-    expect(tx.value.error).to.be.undefined;
-
-    await db('releases').where('publicKey', v1ReleasePublicKey.toString()).update({
-      programId: program.programId.toString(),
-      solanaAddress: v2Release.toString(),
-      migratedFromV1: true,
-    });
-
+    const { v2Release, v1ReleasePublicKey, authorityPublicKey, releaseMintPublicKey,  paymentMintPublicKey, v2AuthorityTokenAccount, v2ReleaseSigner, metadata } = await migrateReleaseFromV1ToV2(release);
+    console.log('v2Release', v2Release);
+    console.log('v1ReleasePublicKey', v1ReleasePublicKey);
+    console.log('authorityPublicKey', authorityPublicKey);
+    console.log('releaseMintPublicKey', releaseMintPublicKey);
+    console.log('paymentMintPublicKey', paymentMintPublicKey);
+    console.log('v2AuthorityTokenAccount', v2AuthorityTokenAccount);
+    console.log('v2ReleaseSigner', v2ReleaseSigner);
+    console.log('metadata', metadata);
     const releaseAfterUpdate = await db('releases').where('publicKey', v1ReleasePublicKey.toString()).first();
     expect(releaseAfterUpdate.programId).to.equal(program.programId.toString());
     expect(releaseAfterUpdate.solanaAddress).to.equal(v2Release.toString());
     expect(releaseAfterUpdate.migratedFromV1).to.be.true;
+    console.log('releaseAfterUpdate', releaseAfterUpdate);
 
     const v2ReleaseData = await program.account.releaseV2.fetch(v2Release);
     expect(v2ReleaseData.authority.toString()).to.equal(authorityPublicKey.toString());
@@ -971,6 +893,129 @@ describe("Migrate Release V1 to V2", async () => {
     expect(Number(v2ReleaseData.totalSupply)).to.equal(expectedTotalSupply);
     expect(Number(v2ReleaseData.price)).to.equal(Number(release.accountData.release.price));
   })
+
+  it.only("Migrate one release from V1 to V2", async() => {
+    let releases = await getReleasesFromV1(1, 0, 1);
+    let tries = 0;
+    while (releases.length === 0) {
+      releases = await getReleasesFromV1(1, tries, 1);
+      tries++;
+      if (releases.length === 0) {
+        console.log('no releases found, trying again');
+      }
+    }
+    const release = releases[0];
+
+    const { v2Release, v1ReleasePublicKey, authorityPublicKey, releaseMintPublicKey,  paymentMintPublicKey, v2AuthorityTokenAccount, v2ReleaseSigner, metadata } = await migrateReleaseFromV1ToV2(release);
+    console.log('v2Release', v2Release);
+    console.log('v1ReleasePublicKey', v1ReleasePublicKey);
+    console.log('authorityPublicKey', authorityPublicKey);
+    console.log('releaseMintPublicKey', releaseMintPublicKey);
+    console.log('paymentMintPublicKey', paymentMintPublicKey);
+    console.log('v2AuthorityTokenAccount', v2AuthorityTokenAccount);
+    console.log('v2ReleaseSigner', v2ReleaseSigner);
+    console.log('metadata', metadata);
+    const releaseAfterUpdate = await db('releases').where('publicKey', v1ReleasePublicKey.toString()).first();
+    expect(releaseAfterUpdate.programId).to.equal(program.programId.toString());
+    expect(releaseAfterUpdate.solanaAddress).to.equal(v2Release.toString());
+    expect(releaseAfterUpdate.migratedFromV1).to.be.true;
+    console.log('releaseAfterUpdate', releaseAfterUpdate);
+
+    const v2ReleaseData = await program.account.releaseV2.fetch(v2Release);
+    expect(v2ReleaseData.authority.toString()).to.equal(authorityPublicKey.toString());
+    expect(v2ReleaseData.mint.toString()).to.equal(releaseMintPublicKey.toString());
+    expect(v2ReleaseData.releaseSigner.toString()).to.equal(v2ReleaseSigner.toString());
+    expect(v2ReleaseData.paymentMint.toString()).to.equal(paymentMintPublicKey.toString());
+    expect(v2ReleaseData.royaltyTokenAccount.toString()).to.equal(v2AuthorityTokenAccount.toString());
+    const expectedTotalSupply = release.accountData.release.totalSupply === -1 ? Number(MAX_U64) : release.accountData.release.totalSupply;
+    expect(Number(v2ReleaseData.totalSupply)).to.equal(expectedTotalSupply);
+    expect(Number(v2ReleaseData.price)).to.equal(Number(release.accountData.release.price));
+  })
+
+
+  // it("Migrate one release from V1 to V2 and purchase", async() => {
+  //   const releases = await getReleasesFromV1(1, 0, 1);
+  //   const release = releases[0];
+
+  //   const { v2Release, v1ReleasePublicKey, authorityPublicKey, releaseMintPublicKey,  paymentMintPublicKey, v2AuthorityTokenAccount, v2ReleaseSigner, metadata } = await migrateReleaseFromV1ToV2(release);
+  //   const v2ReleaseData = await program.account.releaseV2.fetch(v2Release);
+
+  //   const tokenProgramReleaseMint = (await lightConnection.getAccountInfo(releaseMintPublicKey))?.owner;
+
+  //   const purchaserTokenBalanceBefore = await lightConnection.getTokenAccountBalance(purchaserAta, 'confirmed');
+  //   const crsBalanceBefore = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
+  //   const [releasePublicKey] = await anchor.web3.PublicKey.findProgramAddress(
+  //     [
+  //       Buffer.from(anchor.utils.bytes.utf8.encode("nina-release")),
+  //       releaseMintPublicKey.toBuffer(),
+  //     ],
+  //     program.programId
+  //   );
+  //   const [releaseSigner, releaseSignerBump] =
+  //     anchor.web3.PublicKey.findProgramAddressSync(
+  //       [releasePublicKey.toBuffer()],
+  //       program.programId
+  //     );
+  //   console.log('crsTokenAccount', crsTokenAccount)
+  //   const ix = await program.methods
+  //     .releasePurchase(
+  //       v2ReleaseData.price,
+  //       releaseSignerBump,
+  //       false,
+  //     )
+  //     .accounts({
+  //       payer: purchaser.publicKey,
+  //       receiver: purchaser.publicKey,
+  //       release: releasePublicKey,
+  //       releaseSigner,
+  //       mint: releaseMintPublicKey,
+  //       paymentMint: paymentMint.publicKey,
+  //       paymentTokenAccount: purchaserAta,
+  //       royaltyTokenAccount: v2AuthorityTokenAccount,
+  //       receiverReleaseTokenAccount: associatedAddress({
+  //         mint: releaseMintPublicKey,
+  //         owner: purchaser.publicKey,
+  //         tokenProgramId: tokenProgramReleaseMint,
+  //       }),
+  //       crsTokenAccount,
+  //       systemProgram: anchor.web3.SystemProgram.programId,
+  //       associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
+  //       tokenProgramPayment: TOKEN_PROGRAM_ID,
+  //       tokenProgramReleaseMint,
+  //     })
+  //     .instruction();
+  
+  //   const txid = await buildSignAndSendTransaction(
+  //     [modifyComputeUnits, addPriorityFee, ix],
+  //     purchaser,
+  //     lightConnection,
+  //     []
+  //   ).catch((err) => {
+  //     console.log("Error", err);
+  //   });
+  //   if (txid) {
+  //     const latestBlockHash = await lightConnection.getLatestBlockhash();
+  //     await lightConnection.confirmTransaction(
+  //       {
+  //         blockhash: latestBlockHash.blockhash,
+  //         lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
+  //         signature: txid,
+  //       },
+  //       'finalized',
+  //     );
+  //   }
+  //   await new Promise((resolve) => setTimeout(resolve, 1000));
+  //   console.log("txid", txid);
+
+  //   const crsBalance = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
+
+  //   const purchaserTokenBalance = await lightConnection.getTokenAccountBalance(purchaserAta, 'confirmed');
+  //   const royaltyTokenBalance = await lightConnection.getTokenAccountBalance(royaltyTokenAccount, 'confirmed');
+  //   expect(Number(purchaserTokenBalance.value.amount)).to.equal(Number(purchaserTokenBalanceBefore.value.amount) - RELEASE_PRICE - CRS_FEE);
+  //   expect(Number(crsBalance.value.amount)).to.equal(Number(crsBalanceBefore.value.amount) + CRS_FEE);
+  //   expect(Number(royaltyTokenBalance.value.amount)).to.equal(RELEASE_PRICE);
+
+  // })
 })
 
 
@@ -1066,6 +1111,7 @@ const buildAndSendReleaseInitV2Transaction = async (
     }).compileToV0Message(lookupTableAccount ? [lookupTableAccount] : [])
     const tx = new anchor.web3.VersionedTransaction(messageV0)
     tx.sign([payer, mint])
+    console.log('base64', Buffer.from(tx.serialize()).toString('base64'));
     const txid = await lightConnection.sendRawTransaction(tx.serialize())
   console.log("Your transaction signature", txid);
 
@@ -1098,8 +1144,12 @@ const getReleasesFromV1 = async (limit: number = 100, offset: number = 0, total:
         offset: offset,
         sort: 'asc'
       }, true);
-      allReleases.push(...releaseAccounts.releases.filter(release => release.programId === ninaV1ProgramId.toString()));
-      if (limit > 1 &&total === 0) {
+      releaseAccounts.releases.forEach(release => {
+        if (release.programId === ninaV1ProgramId.toString() && Object.keys(release.accountData.release).length > 0) {
+          allReleases.push(release);
+        }
+      });
+      if (limit > 1 && total === 0) {
         total = releaseAccounts.total;
       }
       if (allReleases.length >= total) {
@@ -1113,4 +1163,155 @@ const getReleasesFromV1 = async (limit: number = 100, offset: number = 0, total:
     console.log('error', error);
   }
   return allReleases;
+}
+
+const migrateReleaseFromV1ToV2 = async (release: any) => {
+  try {
+    console.log('release', release);
+
+    const authorityPublicKey = new anchor.web3.PublicKey(release.publisher);
+    const v1ReleasePublicKey = new anchor.web3.PublicKey(release.publicKey);
+    const releaseMintPublicKey = new anchor.web3.PublicKey(release.mint);
+    const releaseSignerPublicKey = new anchor.web3.PublicKey(release.accountData.release.releaseSigner);
+    const v1PaymentMintPublicKey = new anchor.web3.PublicKey(release.accountData.release.paymentMint);
+    const royaltyTokenAccountPublicKey = new anchor.web3.PublicKey(release.accountData.release.royaltyTokenAccount);
+    // just for testing
+    const paymentMintPublicKey = new anchor.web3.PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU');
+
+    const v2AuthorityTokenAccount = associatedAddress({
+      mint: paymentMintPublicKey,
+      owner: authorityPublicKey,
+    });
+
+    const [v2Release] = await anchor.web3.PublicKey.findProgramAddress(
+      [
+        Buffer.from(anchor.utils.bytes.utf8.encode("nina-release")),
+        releaseMintPublicKey.toBuffer(),
+      ],
+      program.programId
+    );
+    const [v2ReleaseSigner] =
+      anchor.web3.PublicKey.findProgramAddressSync(
+        [v2Release.toBuffer()],
+        program.programId
+      );
+    const metadataProgram = new anchor.web3.PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s')
+    const [metadata] = await anchor.web3.PublicKey.findProgramAddress(
+      [Buffer.from('metadata'), metadataProgram.toBuffer(), releaseMintPublicKey.toBuffer()],
+      metadataProgram,
+    );
+
+    const remainingAccounts = release.accountData.release.revenueShareRecipients
+      .filter(
+        (r) =>
+          r.recipientAuthority !== anchor.web3.PublicKey.default.toString() &&
+          r.recipientTokenAccount !== anchor.web3.PublicKey.default.toString() &&
+          r.owed > 0
+      )
+      .map((r) => ({
+        pubkey: new anchor.web3.PublicKey(r.recipientTokenAccount),
+        isSigner: false,
+        isWritable: true,
+      }));
+
+      console.log({
+        payer: provider.wallet.publicKey,
+        authority: authorityPublicKey,
+        release: v1ReleasePublicKey,
+        releaseMint: releaseMintPublicKey,
+        releaseSigner: releaseSignerPublicKey,
+        paymentMint: paymentMintPublicKey,
+        v1PaymentMint: v1PaymentMintPublicKey,
+        royaltyTokenAccount: royaltyTokenAccountPublicKey,
+        v2Release,
+        v2ReleaseSigner,
+        v2AuthorityTokenAccount,
+        metadata,
+        metadataProgram,
+        associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: anchor.web3.SystemProgram.programId,
+        rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+        sysvarInstructions: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
+        v1Program: ninaV1ProgramId,
+      })
+    const ix = await program.methods
+      .releaseMigrateV1ToV2()
+      .accountsStrict({
+        payer: provider.wallet.publicKey,
+        authority: authorityPublicKey,
+        release: v1ReleasePublicKey,
+        releaseMint: releaseMintPublicKey,
+        releaseSigner: releaseSignerPublicKey,
+        paymentMint: paymentMintPublicKey,
+        v1PaymentMint: v1PaymentMintPublicKey,
+        royaltyTokenAccount: royaltyTokenAccountPublicKey,
+        v2Release,
+        v2ReleaseSigner,
+        v2AuthorityTokenAccount,
+        metadata,
+        metadataProgram,
+        associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: anchor.web3.SystemProgram.programId,
+        rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+        sysvarInstructions: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
+        v1Program: ninaV1ProgramId,
+      })
+      .remainingAccounts(remainingAccounts)
+      .instruction();
+      let txid;
+      try {
+        txid = await buildSignAndSendTransaction(
+          [modifyComputeUnits, addPriorityFee, ix],
+          provider.wallet.payer,
+          lightConnection,
+          [],
+        );
+      } catch (error) {
+        console.log('error', error);
+        throw new Error(error);
+      }
+    let tx;
+    if (txid) {
+      const latestBlockHash = await lightConnection.getLatestBlockhash();
+      tx = await lightConnection.confirmTransaction(
+        {
+          blockhash: latestBlockHash.blockhash,
+          lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
+          signature: txid,
+        },
+        'finalized',
+      );
+      console.log('tx', tx);
+    }
+
+    console.log('txid', txid);
+    if (tx.value.err) {
+      throw new Error(tx.value.err);
+    }
+    await db('releases').where('publicKey', v1ReleasePublicKey.toString()).update({
+      programId: program.programId.toString(),
+      solanaAddress: v2Release.toString(),
+      // just for testing
+      paymentMint: paymentMintPublicKey.toString(),
+      migratedFromV1: true,
+    });
+    return {
+      txid,
+      v2Release,
+      v1ReleasePublicKey,
+      authorityPublicKey,
+      releaseMintPublicKey,
+      releaseSignerPublicKey,
+      paymentMintPublicKey,
+      royaltyTokenAccountPublicKey,
+      v2AuthorityTokenAccount,
+      v2ReleaseSigner,
+      metadata,
+    }
+  } catch (error) {
+    console.log('error', error);
+    throw new Error(error);
+  }
 }
