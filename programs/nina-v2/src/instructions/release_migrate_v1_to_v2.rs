@@ -15,28 +15,20 @@ use crate::errors::NinaError;
 use crate::v1;
 use crate::utils::v1_pid;
 
-// release_migrate
-pub const IX_RELEASE_MIGRATE: [u8; 8] = [119, 197, 58, 155, 152, 69, 195, 79]; 
-// hex: 77c53a9b9845c34f  
-
 pub fn metadata_program_id() -> Pubkey {
   Pubkey::from_str("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s").unwrap()
 }
 
-pub fn ix_release_migrate (
-  accounts: Vec<AccountMeta>,
-) -> Result<Instruction> {
-  let mut data = IX_RELEASE_MIGRATE.to_vec();
-  Ok(Instruction {
-      program_id: v1_pid(),
-      accounts,
-      data,
-  })
+pub fn payer_account_id() -> Pubkey {
+  Pubkey::from_str("ninAhDNqCPxwAza2ZYVgjQDTC1cgF1PWaydibbfqhcn").unwrap()
 }
 
 #[derive(Accounts)]
 pub struct ReleaseMigrateV1ToV2<'info> {
-    #[account(mut)]
+    #[account(
+      mut,
+      address = payer_account_id(),
+    )]
     pub payer: Signer<'info>,
     /// CHECK: This is safe bc checked in cpi
     pub authority: UncheckedAccount<'info>,

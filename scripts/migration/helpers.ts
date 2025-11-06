@@ -83,6 +83,7 @@ export const migrateReleaseFromV1ToV2 = async (release: any, program: Program<Ni
     const v1PaymentMintPublicKey = new anchor.web3.PublicKey(release.accountData.release.paymentMint);
     const royaltyTokenAccountPublicKey = new anchor.web3.PublicKey(release.accountData.release.royaltyTokenAccount);
     let paymentMintPublicKey = new anchor.web3.PublicKey(release.accountData.release.paymentMint);
+    
     if (isDevnet()) {
       paymentMintPublicKey = new anchor.web3.PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU');
     }
@@ -227,14 +228,14 @@ export const migrateReleaseFromV1ToV2 = async (release: any, program: Program<Ni
       metadata,
     }
   } catch (error) {
-    await writeMigrationLog(release.publicKey, false, error.message, migrated, txid);
+    await writeMigrationFailureLog(release.publicKey, false, error.message, migrated, txid);
     throw new Error(error);
   }
 }
 
 export const getReleaseFromV1ByPublicKey = async (publicKey: string) => {
   try {
-    const { release } = await Nina.Release.fetch(publicKey, {}, true);
+    const { release } = await Nina.Release.fetch(publicKey, {}, true) as any;
     console.log('release', release);
     if (release.programId !== ninaV1ProgramId.toString()) {
       throw new Error('Release is not from V1');
@@ -249,30 +250,23 @@ export const getReleaseFromV1ByPublicKey = async (publicKey: string) => {
   }
 }
 
-export const getReleasesFromV1 = async (limit: number = 100, offset: number = 0, total: number = 0, program: Program<NinaV2>) => {
+export const getReleasesFromV1 = async (total: number = 100000, program: Program<NinaV2>, offset: number = 0, attempts: number = 0) => {
   console.log('ninaV1ProgramId', ninaV1ProgramId.toString());
   console.log('program.programId', program.programId.toString());
   let allReleases = []
   try {
-    while (allReleases.length <= total) {
-      const releaseAccounts = await Nina.Release.fetchAll({
-        limit,
-        offset: offset,
-        sort: 'asc'
-      }, true);
-      releaseAccounts.releases.forEach(release => {
-        if (release.programId === ninaV1ProgramId.toString() && Object.keys(release.accountData.release).length > 0) {
-          allReleases.push(release);
-        }
-      });
-      if (limit > 1 && total === 0) {
-        total = releaseAccounts.total;
+    const releases = await db('releases').where('programId', ninaV1ProgramId.toString()).where('migratedFromV1', false).limit(total).offset(offset);
+    console.log('releases', releases);
+    for await (const r of releases) {
+      const { release: releaseWithAccountData } = await Nina.Release.fetch(r.publicKey, {}, true) as any;
+      if (Object.keys(releaseWithAccountData.accountData.release).length > 0) {
+        allReleases.push(releaseWithAccountData);
       }
-      if (allReleases.length >= total) {
-        break;
-      }
-      offset += 100;
-      console.log('allReleases', allReleases.length);
+    }
+    console.log('allReleases', allReleases.length);
+    if (allReleases.length < total) {
+      console.log('not enough releases found, trying again - attempts:', attempts + 1);
+      return await getReleasesFromV1(total - allReleases.length, program, (offset * attempts + 1) + total, attempts + 1);
     }
   } catch (error) {
     console.log('broke because of bad release');
@@ -300,12 +294,13 @@ const isMainnet = () => {
 
 export const validateEnvironment = () => {
   if (!isDevnet() && !isMainnet()) {
-    throw new Error(`Invalid environment: \NINA_SOLANA_CLUSTER: ${process.env.NINA_SOLANA_CLUSTER} \nNINA_API_ENDPOINT: ${process.env.NINA_API_ENDPOINT} \nNINA_V1_PROGRAM_ID: ${process.env.NINA_V1_PROGRAM_ID} \nNINA_V2_PROGRAM_ID: ${process.env.NINA_V2_PROGRAM_ID} \nPOSTGRES_DATABASE: ${process.env.POSTGRES_DATABASE}`);
+    throw new Error(`Invalid environment: \nNINA_SOLANA_CLUSTER: ${process.env.NINA_SOLANA_CLUSTER} \nNINA_API_ENDPOINT: ${process.env.NINA_API_ENDPOINT} \nNINA_V1_PROGRAM_ID: ${process.env.NINA_V1_PROGRAM_ID} \nNINA_V2_PROGRAM_ID: ${process.env.NINA_V2_PROGRAM_ID} \nPOSTGRES_DATABASE: ${process.env.POSTGRES_DATABASE}`);
   }
 }
 
 export const validateMigration = async (
   releaseV1,
+  txid: string,
   program: Program<NinaV2>,
   connection: anchor.web3.Connection,
 ) => {
@@ -376,28 +371,236 @@ export const validateMigration = async (
       throw new Error('Release is not valid - v1 royalty token account still exists');
     }
 
+    if (releaseV1.accountData.release.saleTotal > releaseV1.accountData.release.totalCollected) {
+      const revenueShareRecipients = releaseV1.accountData.release.revenueShareRecipients.filter(r => r.owed > 0);
+      if (revenueShareRecipients.length === 0) {
+        throw new Error('Release is not valid - no revenue share recipients found when remainging balance exists');
+      }
+
+      const tokenTransfers = await parseTokenTransfersByDiff(connection, txid);
+      console.log('tokenTransfers', tokenTransfers);
+      if (tokenTransfers.length === 0) {
+        throw new Error('Release is not valid - no token transfers found when remainging balance exists');
+      }
+
+      for (const tokenTransfer of tokenTransfers) {
+        if (tokenTransfer.mint !== releaseV1.accountData.release.paymentMint) {
+          throw new Error('Release is not valid - token transfer mint mismatch');
+        }
+        if (tokenTransfer.from !== releaseV1.accountData.release.releaseSigner) {
+          throw new Error('Release is not valid - token transfer from mismatch');
+        }
+        const revenueShareRecipient = revenueShareRecipients.find(r => r.recipientTokenAccount === tokenTransfer.to);
+        if (!revenueShareRecipient) {
+          throw new Error('Release is not valid - owed revenue share recipient not found in token transfers');
+        }
+        if (Number(tokenTransfer.amount) !== Number(revenueShareRecipient.owed)) {
+          throw new Error('Release is not valid - token transfer amount mismatch to revenue share recipient');
+        }
+      }
+    }
+    await writeMigrationSuccessLog(releaseV1.publicKey, releaseV2.publicKey, txid);
     return true;
   } catch (error) {
     console.log('Migration unsuccessful - validation failed: ',releaseV1.publicKey, error);
-    await writeMigrationLog(releaseV1.publicKey, false, error.message, true);
+    await writeMigrationFailureLog(releaseV1.publicKey, false, error.message, true);
     throw new Error(error);
   }
 }
 
-export const writeMigrationLog = async (
+export const writeMigrationFailureLog = async (
   v1ReleasePublicKey: string,
   isValid: boolean,
   error: string,
   migrated: boolean = false,
   txid?: string
 ) => {
-
   const log = {
+    date: new Date().toISOString(),
     v1ReleasePublicKey,
     isValid,
     error,
     migrated,
     txid,
   }
-  await appendFile(`./scripts/migration/logs/migration-${process.env.NINA_SOLANA_CLUSTER}.log`, JSON.stringify(log) + '\n');
+  await appendFile(`./scripts/migration/logs/migration-failure-${process.env.NINA_SOLANA_CLUSTER}.log`, JSON.stringify(log) + '\n');
+}
+
+export const writeMigrationSuccessLog = async (
+  v1ReleasePublicKey: string,
+  v2ReleasePublicKey: string,
+  txid: string,
+) => {
+  const log = {
+    date: new Date().toISOString(),
+    v2ReleasePublicKey,
+    v1ReleasePublicKey,
+    txid,
+  }
+  await appendFile(`./scripts/migration/logs/migration-success-${process.env.NINA_SOLANA_CLUSTER}.log`, JSON.stringify(log) + '\n');
+}
+
+/**
+ * Parse SPL token transfers from a confirmed/finalized transaction
+ * by diffing pre/post token balances.
+ */
+export type ParsedTokenTransfer = {
+  mint: string;                 // mint address
+  tokenProgram: string;         // token program id (Token or Token-2022)
+  decimals: number;
+  from?: string;                // owner sending (omitted for mint)
+  to?: string;                  // owner receiving (omitted for burn)
+  // amounts in base units
+  amountRaw: bigint;            // absolute amount in smallest units
+  // UI amounts
+  amount: string;               // decimal string using 'decimals'
+  kind: "transfer" | "mint" | "burn";
+};
+
+type BalanceKey = string; // owner|mint|programId
+
+function keyOf(owner: string, mint: string, programId: string): BalanceKey {
+  return `${owner}|${mint}|${programId}`;
+}
+
+function formatUi(amountRaw: bigint, decimals: number): string {
+  const s = amountRaw.toString();
+  if (decimals === 0) return s;
+  const pad = decimals - Math.max(0, s.length - 1);
+  const i = Math.max(0, s.length - decimals);
+  const intPart = i > 0 ? s.slice(0, i) : "0";
+  let frac = i > 0 ? s.slice(i) : s.padStart(decimals, "0");
+  // trim trailing zeros but keep at least one 0 if there is any fractional part
+  frac = frac.replace(/0+$/, "");
+  return frac.length ? `${intPart}.${frac}` : intPart;
+}
+
+export async function parseTokenTransfersByDiff(
+  connection: anchor.web3.Connection,
+  signature: string
+): Promise<ParsedTokenTransfer[]> {
+  const tx: anchor.web3.VersionedTransactionResponse | null = await connection.getTransaction(signature, {
+    maxSupportedTransactionVersion: 0, // or omit to allow v0
+    commitment: "confirmed"
+  });
+
+  if (!tx || !tx.meta) return [];
+
+  const pre = tx.meta.preTokenBalances ?? [];
+  const post = tx.meta.postTokenBalances ?? [];
+
+  // Build maps: key=(owner|mint|programId) -> {decimals, programId, deltaRaw}
+  type Entry = { decimals: number; programId: string; delta: bigint; mint: string; owner: string };
+  const map = new Map<BalanceKey, Entry>();
+
+  const add = (owner: string, mint: string, programId: string, raw: bigint, decimals: number) => {
+    const k = keyOf(owner, mint, programId);
+    const e = map.get(k) ?? { decimals, programId, delta: 0n, mint, owner };
+    e.delta += raw;
+    e.decimals = decimals; // last wins (should be same)
+    map.set(k, e);
+  };
+
+  // helper to parse uiTokenAmount to bigint raw
+  const toRaw = (uiAmountString: string, decimals: number): bigint => {
+    if (!uiAmountString) return 0n;
+    const [i, f = ""] = uiAmountString.split(".");
+    const frac = f.padEnd(decimals, "0").slice(0, decimals);
+    return BigInt((i || "0") + frac);
+  };
+
+  // Start with pre as negative
+  for (const b of pre) {
+    // tokenBalances item may have .owner; if missing, fall back to accountIndex -> accountKeys owner isn’t exposed here,
+    // but modern RPC includes owner. We assume owner exists (1.17+).
+    const owner = b.owner!;
+    const mint = b.mint;
+    const programId = b.programId ?? "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"; // default Token
+    const decimals = b.uiTokenAmount.decimals;
+    const raw = toRaw(b.uiTokenAmount.uiAmountString ?? "0", decimals);
+    add(owner, mint, programId, -raw, decimals);
+  }
+  // Add post as positive
+  for (const b of post) {
+    const owner = b.owner!;
+    const mint = b.mint;
+    const programId = b.programId ?? "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+    const decimals = b.uiTokenAmount.decimals;
+    const raw = toRaw(b.uiTokenAmount.uiAmountString ?? "0", decimals);
+    add(owner, mint, programId, raw, decimals);
+  }
+
+  // Group by (mint, programId) into sends/receives and pair them
+  const byMint = new Map<string, Entry[]>();
+  for (const e of map.values()) {
+    const key = `${e.mint}|${e.programId}`;
+    const arr = byMint.get(key) ?? [];
+    if (e.delta !== 0n) arr.push(e);
+    byMint.set(key, arr);
+  }
+
+  const results: ParsedTokenTransfer[] = [];
+
+  for (const [, entries] of byMint) {
+    const positives = entries.filter(e => e.delta > 0n).sort((a,b)=> Number(b.delta - a.delta)); // largest first
+    const negatives = entries.filter(e => e.delta < 0n).sort((a,b)=> Number(a.delta - b.delta)); // most negative first
+    const decimals = entries[0]?.decimals ?? 0;
+    const mint = entries[0]?.mint!;
+    const tokenProgram = entries[0]?.programId!;
+
+    // Greedy pair amounts
+    let iPos = 0, iNeg = 0;
+    while (iPos < positives.length && iNeg < negatives.length) {
+      const recv = positives[iPos];
+      const send = negatives[iNeg];
+      const take = recv.delta < -send.delta ? recv.delta : -send.delta; // min
+      results.push({
+        kind: "transfer",
+        mint,
+        tokenProgram,
+        decimals,
+        from: send.owner,
+        to: recv.owner,
+        amountRaw: take,
+        amount: formatUi(take, decimals),
+      });
+      // reduce remainders
+      recv.delta -= take;
+      send.delta += take;
+      if (recv.delta === 0n) iPos++;
+      if (send.delta === 0n) iNeg++;
+    }
+
+    // Leftover positives => mints
+    for (; iPos < positives.length; iPos++) {
+      const r = positives[iPos];
+      if (r.delta === 0n) continue;
+      results.push({
+        kind: "mint",
+        mint,
+        tokenProgram,
+        decimals,
+        to: r.owner,
+        amountRaw: r.delta,
+        amount: formatUi(r.delta, decimals),
+      });
+    }
+    // Leftover negatives => burns
+    for (; iNeg < negatives.length; iNeg++) {
+      const s = negatives[iNeg];
+      if (s.delta === 0n) continue;
+      const abs = -s.delta;
+      results.push({
+        kind: "burn",
+        mint,
+        tokenProgram,
+        decimals,
+        from: s.owner,
+        amountRaw: abs,
+        amount: formatUi(abs, decimals),
+      });
+    }
+  }
+
+  return results;
 }

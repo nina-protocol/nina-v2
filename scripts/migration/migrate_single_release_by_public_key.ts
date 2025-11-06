@@ -5,6 +5,7 @@ import {
   migrateReleaseFromV1ToV2,
   getReleaseFromV1ByPublicKey,
   validateEnvironment,
+  validateMigration,
 } from "./helpers";
 import { NinaV2 } from "../../target/types/nina_v2";
 import { Program } from "@coral-xyz/anchor";
@@ -28,8 +29,12 @@ const main = async () => {
     await initHelper(programIdV1, program.programId);
 
     const release = await getReleaseFromV1ByPublicKey(PUBLIC_KEY);
-    const { v2Release, v1ReleasePublicKey } = await migrateReleaseFromV1ToV2(release, program, provider, connection);
-    console.log('Migration successful: v1ReleasePublicKey', v1ReleasePublicKey.toString(), '-> v2Release', v2Release.toString());
+    const { v2Release, v1ReleasePublicKey, txid } = await migrateReleaseFromV1ToV2(release, program, provider, connection);
+    const isValid = await validateMigration(release, txid, program, connection);
+    if (!isValid) {
+      throw new Error('Migration unsuccessful - validation failed');
+    }
+    console.log('Migration successful: v1ReleasePublicKey', v1ReleasePublicKey.toString(), '-> v2Release', v2Release.toString(), '\ntxid:', txid);
   } catch (error) {
     console.log('error', error);
     throw new Error(error);

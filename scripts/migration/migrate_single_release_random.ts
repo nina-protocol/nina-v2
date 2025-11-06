@@ -21,23 +21,19 @@ const main = async () => {
 
     const programIdV1 = new anchor.web3.PublicKey(process.env.NINA_V1_PROGRAM_ID);
     await initHelper(programIdV1, program.programId);
-    let releases: any[] = [];
-    let tries = 0;
-    while (releases.length === 0) {
-      releases = await getReleasesFromV1(1, tries, 1, program);
-      tries++;
-      if (releases.length === 0) {
-        console.log('no releases found, trying again');
-      }
+    const releases = await getReleasesFromV1(1, program, 0, 0);
+    if (releases.length === 0) {
+      console.log('No releases found to migrate');
+      process.exit(1);
     }
     const release = releases[0];
     console.log('Found a release to migrate:', release.publicKey);
-    const { v2Release, v1ReleasePublicKey } = await migrateReleaseFromV1ToV2(release, program, provider, connection);
-    const isValid = await validateMigration(release, program, connection);
+    const { v2Release, v1ReleasePublicKey, txid } = await migrateReleaseFromV1ToV2(release, program, provider, connection);
+    const isValid = await validateMigration(release, txid, program, connection);
     if (!isValid) {
       throw new Error('Migration unsuccessful - validation failed');
     }
-    console.log('Migration successful: v1ReleasePublicKey', v1ReleasePublicKey.toString(), '-> v2Release', v2Release.toString());
+    console.log('Migration successful: v1ReleasePublicKey', v1ReleasePublicKey.toString(), '-> v2Release', v2Release.toString(), '\ntxid:', txid);
   } catch (error) {
     console.log('Migration unsuccessful - error: ', error);
     throw new Error(error);
