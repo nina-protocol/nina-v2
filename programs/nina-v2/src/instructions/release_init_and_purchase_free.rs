@@ -13,7 +13,7 @@ use anchor_spl::{
 
 use crate::state::ReleaseV2;
 use crate::instructions::release_init_v2::{set_release_data, initialize_token_metadata, update_mint_balance};
-use crate::instructions::release_purchase::{validate_purchase, transfer_payment, transfer_crs, mint_release_token, mint_release_token_v2};
+use crate::instructions::release_purchase::{validate_purchase, transfer_payment, transfer_crs, mint_release_token_v2};
 use crate::utils::file_service_account_key;
 use crate::errors::NinaError;
 
@@ -28,7 +28,7 @@ const RELEASE_INIT_TX_COST: u64 = 8_901_840;
   total_supply: u64,
   price: u64,
 )]
-pub struct ReleaseInitAndPurchase<'info> {
+pub struct ReleaseInitAndPurchaseFree<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     #[account(mut)]
@@ -40,7 +40,7 @@ pub struct ReleaseInitAndPurchase<'info> {
         init,
         seeds = [b"nina-release", mint.key.as_ref()],
         bump,
-        payer = receiver,
+        payer = payer,
         space = 232,
     )]
     pub release: Account<'info, ReleaseV2>,
@@ -52,7 +52,7 @@ pub struct ReleaseInitAndPurchase<'info> {
     pub release_signer: UncheckedAccount<'info>,
     #[account(
         init,
-        payer = receiver,
+        payer = payer,
         mint::token_program = token_2022_program,
         mint::decimals = 0,
         mint::authority = release_signer,
@@ -63,7 +63,7 @@ pub struct ReleaseInitAndPurchase<'info> {
     pub payment_mint: Box<InterfaceAccount<'info, Mint>>,
     #[account(
       init_if_needed,
-      payer = receiver,
+      payer = payer,
       associated_token::token_program = token_program,
       associated_token::mint = payment_mint,
       associated_token::authority = receiver,
@@ -78,12 +78,16 @@ pub struct ReleaseInitAndPurchase<'info> {
   pub royalty_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         init_if_needed,
-        payer = receiver,
+        payer = payer,
         associated_token::token_program = token_2022_program,
         associated_token::mint = mint,
         associated_token::authority = receiver,
     )]
     pub receiver_release_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
+    #[account(mut)]
+    pub receiver_wrapped_sol_account: Box<InterfaceAccount<'info, TokenAccount>>,
+    #[account(mut)]
+    pub temp_wrapped_sol_account: Box<InterfaceAccount<'info, TokenAccount>>,
     pub system_program: Program<'info, System>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub token_program: Program<'info, Token>,
@@ -91,7 +95,7 @@ pub struct ReleaseInitAndPurchase<'info> {
 }
 
 pub fn handler(
-    ctx: Context<ReleaseInitAndPurchase>,
+    ctx: Context<ReleaseInitAndPurchaseFree>,
     release_signer_bump: u8,
     release_identifier: String,
     uri_type: u8,
@@ -107,6 +111,26 @@ pub fn handler(
             return Err(error!(NinaError::DelegatedPayerMismatch));
         }
     }
+
+    if price == 0 && ctx.accounts.payer.key() == file_service_account_key() {
+      let transfer_ctx = CpiContext::new(
+          ctx.accounts.token_program.to_account_info(),
+          Transfer {
+              from: ctx.accounts.receiver_wrapped_sol_account.to_account_info(),
+              to: ctx.accounts.temp_wrapped_sol_account.to_account_info(),
+              authority: ctx.accounts.receiver.to_account_info(),
+          },
+      );
+      transfer(transfer_ctx, RELEASE_INIT_TX_COST)?;
+
+      let cpi_accounts = CloseAccount {
+          account: ctx.accounts.temp_wrapped_sol_account.to_account_info(),
+          destination: ctx.accounts.payer.to_account_info(), // receives native SOL
+          authority: ctx.accounts.payer.to_account_info(),      // close authority (owner of ATA)
+      };
+      let cpi_ctx = CpiContext::new(ctx.accounts.token_program.to_account_info(), cpi_accounts);
+      close_account(cpi_ctx)?;
+  }
 
     let full_uri = build_full_uri(&ctx.accounts.authority.key(), &release_identifier, uri_type);
     msg!("Initializing token metadata");

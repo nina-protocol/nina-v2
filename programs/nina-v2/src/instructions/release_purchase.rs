@@ -6,22 +6,24 @@ use anchor_spl::{
         Token2022,
         Mint,
         TokenAccount,
+        TokenInterface,
     },
     token_2022::{MintTo, mint_to},
 };
-
+use anchor_spl::token_interface as splti;
 use crate::state::ReleaseV2;
 use crate::errors::NinaError;
 use crate::utils::id_account_key;
 
 const BASIS_POINTS: u64 = 1_000_000;
-const ONE_USDC: u64 = 10_000_000;
+const ONE_USDC: u64 = 1_000_000;
 const TEN_PERCENT: u64 = 100_000;
 
 #[derive(Accounts)]
 #[instruction(
   amount: u64,
   release_signer_bump: u8,
+  bypass_crs: bool,
 )]
 pub struct ReleasePurchase<'info> {
     #[account(mut)]
@@ -64,27 +66,28 @@ pub struct ReleasePurchase<'info> {
     #[account(
         init_if_needed,
         payer = payer,
-        associated_token::token_program = token_2022_program,
+        associated_token::token_program = token_program_release_mint,
         associated_token::mint = mint,
         associated_token::authority = receiver,
     )]
     pub receiver_release_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
-    ///TODO: CHECK THAT ADDRESS === EXPECTED CRS ADDRESS
-    // #[account(
-    //   mut,
-    //   constraint = crs_token_account.mint == release.payment_mint,
-    // )]
-    // pub crs_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
+    #[account(
+      mut,
+      constraint = crs_token_account.mint == release.payment_mint,
+      constraint = crs_token_account.owner == pubkey!("crsNECAdnFS1dUM136E13AuARA5XPCBqAy2gTzyp7dv"),
+    )]
+    pub crs_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
     pub system_program: Program<'info, System>,
     pub associated_token_program: Program<'info, AssociatedToken>,
-    pub token_program: Program<'info, Token>,
-    pub token_2022_program: Program<'info, Token2022>,
+    pub token_program_payment: Program<'info, Token>,
+    pub token_program_release_mint: Interface<'info, TokenInterface>,
 }
 
 pub fn handler<'c: 'info, 'info>(
     ctx: Context<'_, '_, 'c, 'info, ReleasePurchase<'info>>,
     amount: u64,
     release_signer_bump: u8,
+    bypass_crs: bool,
 ) -> Result<()> {
     if ctx.accounts.payer.key() != ctx.accounts.receiver.key() {
         #[cfg(feature = "is-test")]
@@ -99,24 +102,26 @@ pub fn handler<'c: 'info, 'info>(
         &ctx.accounts.payment_token_account,
         &ctx.accounts.royalty_token_account,
         &ctx.accounts.receiver,
-        &ctx.accounts.token_program,
+        &ctx.accounts.token_program_payment,
         amount,
     )?;
     
-    // transfer_crs(
-    //     &ctx.accounts.payment_token_account,
-    //     &ctx.accounts.crs_token_account,
-    //     &ctx.accounts.receiver,
-    //     &ctx.accounts.token_program,
-    //     amount,
-    // )?;
+    if bypass_crs == false {
+        transfer_crs(
+            &ctx.accounts.payment_token_account,
+            &ctx.accounts.crs_token_account,
+            &ctx.accounts.receiver,
+            &ctx.accounts.token_program_payment,
+            ONE_USDC,
+        )?;
+    }
     
     mint_release_token(
         &ctx.accounts.mint,
         &ctx.accounts.receiver_release_token_account,
         &ctx.accounts.release_signer,
         &ctx.accounts.release,
-        &ctx.accounts.token_2022_program,
+        &ctx.accounts.token_program_release_mint,
         release_signer_bump,
     )?;
     
@@ -165,6 +170,36 @@ pub fn mint_release_token<'info>(
     receiver_release_token_account: &InterfaceAccount<'info, TokenAccount>,
     release_signer: &UncheckedAccount<'info>,
     release: &Account<'info, ReleaseV2>,
+    token_program_release_mint: &Interface<'info, TokenInterface>,
+    release_signer_bump: u8,
+) -> Result<()> {
+    let cpi_accounts_mint_to = splti::MintTo {
+        mint: mint.to_account_info(),
+        to: receiver_release_token_account.to_account_info(),
+        authority: release_signer.to_account_info(),
+    };
+
+    let seeds = &[
+        release.to_account_info().key.as_ref(),
+        &[release_signer_bump],
+    ];
+    let signer = &[&seeds[..]];
+    
+    let cpi_ctx_mint_to = CpiContext::new_with_signer(
+        token_program_release_mint.to_account_info(),
+        cpi_accounts_mint_to,
+        signer
+    );
+    
+    mint_to(cpi_ctx_mint_to, 1)
+}
+
+
+pub fn mint_release_token_v2<'info>(
+    mint: &InterfaceAccount<'info, Mint>,
+    receiver_release_token_account: &InterfaceAccount<'info, TokenAccount>,
+    release_signer: &UncheckedAccount<'info>,
+    release: &Account<'info, ReleaseV2>,
     token_2022_program: &Program<'info, Token2022>,
     release_signer_bump: u8,
 ) -> Result<()> {
@@ -192,18 +227,18 @@ pub fn mint_release_token<'info>(
 pub fn transfer_crs<'info>(
     payment_token_account: &InterfaceAccount<'info, TokenAccount>,
     crs_token_account: &InterfaceAccount<'info, TokenAccount>,
-    receiver: &UncheckedAccount<'info>,
+    receiver: &Signer<'info>,
     token_program: &Program<'info, Token>,
     amount: u64,
 ) -> Result<()> {
     let mut crs_amount = ONE_USDC;
-    if amount > ONE_USDC {
-        crs_amount = amount
-            .checked_mul(TEN_PERCENT)
-            .ok_or(NinaError::ArithmeticError)?
-            .checked_div(BASIS_POINTS)
-            .ok_or(NinaError::ArithmeticError)?
-    }
+    // if amount > ONE_USDC {
+    //     crs_amount = amount
+    //         .checked_mul(TEN_PERCENT)
+    //         .ok_or(NinaError::ArithmeticError)?
+    //         .checked_div(BASIS_POINTS)
+    //         .ok_or(NinaError::ArithmeticError)?
+    // }
 
     let cpi_accounts = Transfer {
         from: payment_token_account.to_account_info(),

@@ -28,7 +28,7 @@ const RELEASE_INIT_TX_COST: u64 = 8_901_840;
   total_supply: u64,
   price: u64,
 )]
-pub struct ReleaseInitAndPurchase<'info> {
+pub struct ReleaseInitAndPurchaseFreeFs<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     #[account(mut)]
@@ -40,7 +40,7 @@ pub struct ReleaseInitAndPurchase<'info> {
         init,
         seeds = [b"nina-release", mint.key.as_ref()],
         bump,
-        payer = receiver,
+        payer = payer,
         space = 232,
     )]
     pub release: Account<'info, ReleaseV2>,
@@ -52,7 +52,7 @@ pub struct ReleaseInitAndPurchase<'info> {
     pub release_signer: UncheckedAccount<'info>,
     #[account(
         init,
-        payer = receiver,
+        payer = payer,
         mint::token_program = token_2022_program,
         mint::decimals = 0,
         mint::authority = release_signer,
@@ -63,7 +63,7 @@ pub struct ReleaseInitAndPurchase<'info> {
     pub payment_mint: Box<InterfaceAccount<'info, Mint>>,
     #[account(
       init_if_needed,
-      payer = receiver,
+      payer = payer,
       associated_token::token_program = token_program,
       associated_token::mint = payment_mint,
       associated_token::authority = receiver,
@@ -78,7 +78,7 @@ pub struct ReleaseInitAndPurchase<'info> {
   pub royalty_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         init_if_needed,
-        payer = receiver,
+        payer = payer,
         associated_token::token_program = token_2022_program,
         associated_token::mint = mint,
         associated_token::authority = receiver,
@@ -91,7 +91,7 @@ pub struct ReleaseInitAndPurchase<'info> {
 }
 
 pub fn handler(
-    ctx: Context<ReleaseInitAndPurchase>,
+    ctx: Context<ReleaseInitAndPurchaseFreeFs>,
     release_signer_bump: u8,
     release_identifier: String,
     uri_type: u8,
@@ -101,11 +101,13 @@ pub fn handler(
     price: u64,
 ) -> Result<()> {
 
-    if ctx.accounts.payer.key() != ctx.accounts.authority.key() {
-        #[cfg(feature = "is-test")]
-        if ctx.accounts.payer.key() != file_service_account_key() {
-            return Err(error!(NinaError::DelegatedPayerMismatch));
-        }
+    #[cfg(feature = "is-test")]
+    if ctx.accounts.payer.key() != file_service_account_key() {
+        return Err(error!(NinaError::DelegatedPayerMismatch));
+    }
+
+    if price > 0 {
+        return Err(error!(NinaError::ReleasePurchaseWrongAmount));
     }
 
     let full_uri = build_full_uri(&ctx.accounts.authority.key(), &release_identifier, uri_type);

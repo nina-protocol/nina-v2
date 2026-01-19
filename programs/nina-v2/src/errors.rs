@@ -14,4 +14,14 @@ pub enum NinaError {
     DelegatedPayerMismatch,
     #[msg("Release Claim not free")]
     ReleaseClaimNotFree,
+    #[msg("Release Init Tx Cost not paid")]
+    ReleaseInitTxCostNotPaid,
+    #[msg("Invalid Close Authority")]
+    InvalidCloseAuthority,
+    #[msg("Invalid Transfer Authority")]
+    InvalidTransferAuthority,
+    #[msg("Invalid Account Data")]
+    InvalidAccountData,
+    #[msg("Metadata Deserialize Failed")]
+    MetadataDeserializeFailed,
 }

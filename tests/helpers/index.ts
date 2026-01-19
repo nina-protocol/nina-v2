@@ -15,6 +15,8 @@ export const buildSignAndSendTransaction = async (
   }).compileToV0Message([...lookupTableAccount])
   const tx = new anchor.web3.VersionedTransaction(messageV0)
   tx.sign([payer, ...additionalSigners])
+  console.log('tx', tx.serialize());
+  console.log('base64', Buffer.from(tx.serialize({verifySignatures: false})).toString('base64'));
   const txid = await connection.sendRawTransaction(tx.serialize(), {
     skipPreflight: true,
   })

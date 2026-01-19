@@ -6,37 +6,42 @@ pub mod state;
 pub mod instructions;
 pub mod utils;
 pub mod errors;
+pub mod v1;
 
 pub use state::*;
 pub use instructions::*;
 pub use utils::*;
 pub use errors::*;
-  
+pub use v1::*;
+
 #[program]
 pub mod nina_v2 {
     use super::*;
 
     pub fn release_init_v2(
         ctx: Context<ReleaseInitV2>,
-        uri: String,
+        release_identifier: String,
+        uri_type: u8,
         name: String,
         symbol: String,
         total_supply:u64,
         price: u64,
         release_signer_bump: u8,
     ) -> Result<()> {
-        instructions::release_init_v2::handler(ctx, uri, name, symbol, total_supply, price, release_signer_bump)
+        instructions::release_init_v2::handler(ctx, release_identifier, uri_type, name, symbol, total_supply, price, release_signer_bump)
     }
 
     pub fn release_purchase<'c: 'info, 'info>(
         ctx: Context<'_, '_, 'c, 'info, ReleasePurchase<'info>>,
         amount: u64,
         release_signer_bump: u8,
+        bypass_crs: bool,
     ) -> Result<()> {
         instructions::release_purchase::handler(
             ctx,
             amount,
             release_signer_bump,
+            bypass_crs,
         )
     }
 
@@ -51,7 +56,8 @@ pub mod nina_v2 {
     pub fn release_init_and_purchase<'c: 'info, 'info>(
         ctx: Context<'_, '_, 'c, 'info, ReleaseInitAndPurchase<'info>>,
         release_signer_bump: u8,
-        uri: String,
+        release_identifier: String,
+        uri_type: u8,
         name: String,
         symbol: String,
         total_supply: u64,
@@ -60,12 +66,26 @@ pub mod nina_v2 {
         instructions::release_init_and_purchase::handler(
             ctx,
             release_signer_bump,
-            uri,
+            release_identifier,
+            uri_type,
             name,
             symbol,
             total_supply,
             price,
         )
+    }
+
+    pub fn release_init_and_purchase_free<'c: 'info, 'info>(
+        ctx: Context<'_, '_, 'c, 'info, ReleaseInitAndPurchaseFree<'info>>,
+        release_signer_bump: u8,
+        release_identifier: String,
+        uri_type: u8,
+        name: String,
+        symbol: String,
+        total_supply: u64,
+        price: u64,
+    ) -> Result<()> {
+        instructions::release_init_and_purchase_free::handler(ctx, release_signer_bump, release_identifier, uri_type, name, symbol, total_supply, price)
     }
 
     pub fn release_update<'c: 'info, 'info>(
@@ -84,5 +104,32 @@ pub mod nina_v2 {
         ctx: Context<'_, '_, 'c, 'info, ReleaseClose<'info>>,
     ) -> Result<()> {
         instructions::release_close::handler(ctx)
+    }
+
+    pub fn release_migrate_v1_to_v2<'c: 'info, 'info>(
+        ctx: Context<'_, '_, 'c, 'info, ReleaseMigrateV1ToV2<'info>>,
+    ) -> Result<()> {
+        instructions::release_migrate_v1_to_v2::handler(ctx)
+    }
+
+    pub fn release_update_metaplex<'c: 'info, 'info>(
+        ctx: Context<'_, '_, 'c, 'info, ReleaseUpdateMetaplex<'info>>,
+        metadata_data: ReleaseMetadataData,
+        release_signer_bump: u8,
+    ) -> Result<()> {
+        instructions::release_update_metaplex::handler(ctx, metadata_data, release_signer_bump)
+    }
+
+    pub fn release_init_and_purchase_free_fs<'c: 'info, 'info>(
+        ctx: Context<'_, '_, 'c, 'info, ReleaseInitAndPurchaseFreeFs<'info>>,
+        release_signer_bump: u8,
+        release_identifier: String,
+        uri_type: u8,
+        name: String,
+        symbol: String,
+        total_supply: u64,
+        price: u64,
+    ) -> Result<()> {
+        instructions::release_init_and_purchase_free_fs::handler(ctx, release_signer_bump, release_identifier, uri_type, name, symbol, total_supply, price)
     }
 }

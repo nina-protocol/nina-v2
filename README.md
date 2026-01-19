@@ -1,1 +1,4 @@
 program id: nina2DQvAA8Sa9rxG72swBcNNDYQxdWGojzwDk9yn2q
+crs account: crsNECAdnFS1dUM136E13AuARA5XPCBqAy2gTzyp7dv
+crs usdc (dev): 6HGexPPLoDap47JU2LzyH2eT45t6jLJHUQ36YyzbbTHu
+crs usdc (mainnet): 4xsqQMtNmumQgA9G2Gz8FPGrmdUCqbuAvrNiEsLpKDjb
