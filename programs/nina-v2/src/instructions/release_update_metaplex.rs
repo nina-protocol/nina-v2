@@ -2,12 +2,13 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{self, TokenAccount, Mint, Token, Burn};
 use mpl_token_metadata::{
   self,
+  accounts::Metadata as MetadataAccount,
   types::{Creator, DataV2},
   instructions::{CreateMetadataAccountV3Cpi, UpdateMetadataAccountV2Cpi, CreateMetadataAccountV3CpiAccounts, UpdateMetadataAccountV2CpiAccounts, CreateMetadataAccountV3InstructionArgs, UpdateMetadataAccountV2InstructionArgs},
 };
 
 use crate::state::*;
-use crate::utils::file_service_account_key;
+use crate::utils::{file_service_account_key, migration_payer_account_key};
 use crate::errors::NinaError;
 
 #[derive(Accounts)]
@@ -61,17 +62,15 @@ pub fn handler(
     release_signer_bump: u8,
 ) -> Result<()> {
     if ctx.accounts.payer.key() != ctx.accounts.authority.key() {
-        if ctx.accounts.payer.key() != file_service_account_key() {
+        if ctx.accounts.payer.key() != file_service_account_key() && 
+           ctx.accounts.payer.key() != migration_payer_account_key() {
             return Err(NinaError::DelegatedPayerMismatch.into());
         }
     }
 
-    let creators: Vec<Creator> =
-    vec![Creator {
-        address: *ctx.accounts.release_signer.key,
-        verified: true,
-        share: 100,
-    }];
+    let mut metadata_bytes = ctx.accounts.metadata.data.borrow().to_vec();
+    let metadata_state = MetadataAccount::deserialize(&mut metadata_bytes.as_slice())
+        .map_err(|_| error!(NinaError::MetadataDeserializeFailed))?;
 
     let seeds = &[
         ctx.accounts.release.to_account_info().key.as_ref(),
@@ -91,7 +90,7 @@ pub fn handler(
                 symbol: metadata_data.symbol,
                 uri: metadata_data.uri.clone(),
                 seller_fee_basis_points: metadata_data.seller_fee_basis_points,
-                creators: Some(creators),
+                creators: metadata_state.creators.clone(),
                 collection: None,
                 uses: None
             }),

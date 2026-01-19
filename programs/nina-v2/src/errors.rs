@@ -22,4 +22,6 @@ pub enum NinaError {
     InvalidTransferAuthority,
     #[msg("Invalid Account Data")]
     InvalidAccountData,
+    #[msg("Metadata Deserialize Failed")]
+    MetadataDeserializeFailed,
 }

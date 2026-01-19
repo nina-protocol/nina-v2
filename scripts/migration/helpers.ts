@@ -18,6 +18,7 @@ import Knex from "knex";
 import { buildSignAndSendTransaction } from "../../tests/helpers/index";
 import Nina from "@nina-protocol/js-sdk-dev"
 import { appendFile } from 'fs/promises';
+import { Metaplex } from "@metaplex-foundation/js";
 
 const MAX_U64 = new anchor.BN('ffffffffffffffff', 16);
 
@@ -33,6 +34,7 @@ const knexConfig = {
 const db = Knex(knexConfig)
 let ninaV1ProgramId: anchor.web3.PublicKey;
 let ninaV2ProgramId: anchor.web3.PublicKey;
+let metaplex: Metaplex;
 
 export const initHelper = async (programId: anchor.web3.PublicKey, programIdV2: anchor.web3.PublicKey) => {
   validateEnvironment();
@@ -44,7 +46,9 @@ export const initHelper = async (programId: anchor.web3.PublicKey, programIdV2: 
     programId: programId,
     programIdV2: programIdV2,
     cluster: process.env.NINA_SOLANA_CLUSTER,
-  });
+    apiKey: process.env.NINA_API_KEY,
+  } as any);
+  metaplex = new Metaplex(new anchor.web3.Connection(process.env.NINA_RPC_ENDPOINT));
 }
 
 export function associatedAddress({
@@ -83,7 +87,7 @@ export const migrateReleaseFromV1ToV2 = async (release: any, program: Program<Ni
     const v1PaymentMintPublicKey = new anchor.web3.PublicKey(release.accountData.release.paymentMint);
     const royaltyTokenAccountPublicKey = new anchor.web3.PublicKey(release.accountData.release.royaltyTokenAccount);
     let paymentMintPublicKey = new anchor.web3.PublicKey(release.accountData.release.paymentMint);
-    
+
     if (isDevnet()) {
       paymentMintPublicKey = new anchor.web3.PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU');
     }
@@ -254,20 +258,38 @@ export const getReleasesFromV1 = async (total: number = 100000, program: Program
   console.log('ninaV1ProgramId', ninaV1ProgramId.toString());
   console.log('program.programId', program.programId.toString());
   let allReleases = []
+  let immutableCount = 0;
   try {
     const releases = await db('releases').where('programId', ninaV1ProgramId.toString()).where('migratedFromV1', false).limit(total).offset(offset);
-    console.log('releases', releases);
+    console.log('releases', releases.length);
     for await (const r of releases) {
       const { release: releaseWithAccountData } = await Nina.Release.fetch(r.publicKey, {}, true) as any;
-      if (Object.keys(releaseWithAccountData.accountData.release).length > 0) {
-        allReleases.push(releaseWithAccountData);
+      let metadataAccount = (await metaplex.nfts().findAllByMintList({mints: [new anchor.web3.PublicKey(releaseWithAccountData.mint)]}, { commitment: 'confirmed' }))[0];
+      if (releaseWithAccountData.paymentMint === 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v') {
+        if (Object.keys(releaseWithAccountData.accountData.release).length > 0) {
+          if (metadataAccount.isMutable) {
+            allReleases.push(releaseWithAccountData);
+          } else {
+            immutableCount++;
+            console.log('metadata is not mutable, skipping: ', releaseWithAccountData.publicKey);
+          }
+        }
       }
     }
     console.log('allReleases', allReleases.length);
     if (allReleases.length < total) {
-      console.log('not enough releases found, trying again - attempts:', attempts + 1);
-      return await getReleasesFromV1(total - allReleases.length, program, (offset * attempts + 1) + total, attempts + 1);
+      const remaining = total - allReleases.length;
+
+      const more = await getReleasesFromV1(
+        remaining,
+        program,
+        offset + releases.length, // see next bug
+        attempts + 1,
+      );
+      return [...allReleases, ...more];
     }
+    console.log('immutableCount', immutableCount);
+    return { allReleases, immutableCount };
   } catch (error) {
     console.log('broke because of bad release');
     console.log('error', error);
@@ -305,6 +327,9 @@ export const validateMigration = async (
   connection: anchor.web3.Connection,
 ) => {
   try {
+    console.log('waiting 5 seconds before validating migration');
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+
     const releaseV2 = await db('releases').where('publicKey', releaseV1.publicKey).first();
     if (!releaseV2) {
       throw new Error('Release is not valid - v2 release not found in database');
@@ -341,7 +366,6 @@ export const validateMigration = async (
         throw new Error('Release is not valid - payment mint mismatch');
       }
     }
-
     const releaseV2Account = await program.account.releaseV2.fetch(new anchor.web3.PublicKey(releaseV2.solanaAddress));
     if (releaseV2Account.authority.toString() !== releaseV1.publisher) {
       throw new Error('Release is not valid - authority mismatch');
@@ -399,11 +423,22 @@ export const validateMigration = async (
         }
       }
     }
+
+    console.log('releaseV2', releaseV2);
+    // Check metadata authority
+    let metadataAccount = (await metaplex.nfts().findAllByMintList({mints: [new anchor.web3.PublicKey(releaseV2.mint)]}, { commitment: 'confirmed' }))[0];
+    console.log('metadataAccount', metadataAccount);
+    if (metadataAccount.updateAuthorityAddress.toString() !== releaseV2Account.releaseSigner.toString()) {
+      throw new Error('Release is not valid - metadata authority mismatch');
+    }
+    if (metadataAccount.isMutable !== true) {
+      throw new Error('Release is not valid - metadata is not mutable');
+    }
     await writeMigrationSuccessLog(releaseV1.publicKey, releaseV2.publicKey, txid);
     return true;
   } catch (error) {
     console.log('Migration unsuccessful - validation failed: ',releaseV1.publicKey, error);
-    await writeMigrationFailureLog(releaseV1.publicKey, false, error.message, true);
+    await writeMigrationFailureLog(releaseV1.publicKey, false, JSON.stringify(error), true);
     throw new Error(error);
   }
 }

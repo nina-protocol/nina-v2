@@ -119,4 +119,17 @@ pub mod nina_v2 {
     ) -> Result<()> {
         instructions::release_update_metaplex::handler(ctx, metadata_data, release_signer_bump)
     }
+
+    pub fn release_init_and_purchase_free_fs<'c: 'info, 'info>(
+        ctx: Context<'_, '_, 'c, 'info, ReleaseInitAndPurchaseFreeFs<'info>>,
+        release_signer_bump: u8,
+        release_identifier: String,
+        uri_type: u8,
+        name: String,
+        symbol: String,
+        total_supply: u64,
+        price: u64,
+    ) -> Result<()> {
+        instructions::release_init_and_purchase_free_fs::handler(ctx, release_signer_bump, release_identifier, uri_type, name, symbol, total_supply, price)
+    }
 }

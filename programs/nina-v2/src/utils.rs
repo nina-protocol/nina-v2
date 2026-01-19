@@ -26,13 +26,20 @@ pub fn update_account_lamports_to_minimum_balance<'info>(
   payer: AccountInfo<'info>,
   system_program: AccountInfo<'info>,
 ) -> Result<()> {
-  let extra_lamports = Rent::get()?.minimum_balance(account.data_len()) - account.get_lamports();
-  if extra_lamports > 0 {
+
+  let rent = Rent::get()?;
+  let min_lamports = rent.minimum_balance(account.data_len());
+  let current_lamports = account.lamports();
+
+  if current_lamports < min_lamports {
+      let extra_lamports = min_lamports - current_lamports;
+
       invoke(
           &transfer(payer.key, account.key, extra_lamports),
           &[payer, account, system_program],
       )?;
   }
+  
   Ok(())
 }
 
@@ -70,5 +77,9 @@ pub fn id_account_key() -> Pubkey {
 }
 
 pub fn v1_pid() -> Pubkey {
-  Pubkey::from_str("77BKtqWTbTRxj5eZPuFbeXjx3qz4TTHoXRnpCejYWiQH").unwrap()
+  Pubkey::from_str("ninaN2tm9vUkxoanvGcNApEeWiidLMM2TdBX8HoJuL4").unwrap()
+}
+
+pub fn migration_payer_account_key() -> Pubkey {
+  Pubkey::from_str("ninAhDNqCPxwAza2ZYVgjQDTC1cgF1PWaydibbfqhcn").unwrap()
 }

@@ -41,7 +41,7 @@ const TOKEN_2022_PROGRAM_ID = new anchor.web3.PublicKey(
 const CRS_FEE = 10_000_000;
 const MAX_U64 = new anchor.BN('ffffffffffffffff', 16);
 
-const lightConnection = new anchor.web3.Connection('https://nina.devnet.rpcpool.com/070dec34-5a03-4ee7-9555-d91e51d7d6f2');
+const lightConnection = new anchor.web3.Connection('http://localhost:8899');
 const provider = new anchor.AnchorProvider(lightConnection, anchor.Wallet.local(), anchor.AnchorProvider.defaultOptions());
 anchor.setProvider(provider);
 const program = anchor.workspace.NinaV2 as Program<NinaV2>;
@@ -76,7 +76,7 @@ let ninaTreasuryAta: PublicKey;
 let crsAccount = new PublicKey("crsNECAdnFS1dUM136E13AuARA5XPCBqAy2gTzyp7dv");
 let crsTokenAccount: PublicKey;
 
-describe.only("nina-v2", () => {
+describe("nina-v2", () => {
 
   it("setup accounts", async () => {
     console.log("before airdrop");
@@ -312,7 +312,7 @@ describe.only("nina-v2", () => {
   //   expect(Number(royaltyTokenBalance.value.amount)).to.equal(RELEASE_PRICE);
   // });
 
-  it.skip("Initialize A $20 Release for publisher with paymentMint ATA", async () => {
+  it("Initialize A $20 Release for publisher with paymentMint ATA", async () => {
     const balanceBefore = await lightConnection.getBalance(payer.publicKey);
     console.log("Balance before", balanceBefore);
 
@@ -457,7 +457,7 @@ describe.only("nina-v2", () => {
     expect(Number(crsBalance.value.amount)).to.equal(Number(crsBalanceBefore.value.amount) + CRS_FEE);
   });
 
-  it.skip("Initialize A Release and Purchase", async () => {
+  it("Initialize A Release and Purchase", async () => {
     await new Promise((resolve) => setTimeout(resolve, 5000));
     const purchaserTokenBalanceBefore = await lightConnection.getTokenAccountBalance(purchaserAta, 'confirmed');
     const crsBalanceBefore = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
@@ -594,7 +594,7 @@ describe.only("nina-v2", () => {
     expect(Number(royaltyTokenBalance.value.amount)).to.equal(Number(royaltyTokenBalanceBefore === 0 ? 0 : royaltyTokenBalanceBefore.value.amount) + RELEASE_PRICE);
   });
 
-  it.skip("Initialize A Release and Purchase And Close", async () => {
+  it("Initialize A Release and Purchase And Close", async () => {
     await new Promise((resolve) => setTimeout(resolve, 5000));
     const purchaserTokenBalanceBefore = await lightConnection.getTokenAccountBalance(purchaserAta, 'confirmed');
     const crsBalanceBefore = await lightConnection.getTokenAccountBalance(crsTokenAccount, 'confirmed');
@@ -764,7 +764,7 @@ describe.only("nina-v2", () => {
   });
 
 
-  it.skip("Update Metadata Token2022 Mint", async () => {
+  it("Update Metadata Token2022 Mint", async () => {
     const [release] = await anchor.web3.PublicKey.findProgramAddress(
       [
         Buffer.from(anchor.utils.bytes.utf8.encode("nina-release")),
@@ -814,7 +814,7 @@ describe.only("nina-v2", () => {
         'finalized',
       );
     }
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 5000));
     console.log("txid", txid);
 
     const metadata = await getTokenMetadata(lightConnection, mint3.publicKey, 'confirmed');
@@ -831,7 +831,7 @@ describe.only("nina-v2", () => {
 });
 
 
-describe("Migrate Release V1 to V2", async () => {
+describe.skip("Migrate Release V1 to V2", async () => {
   before(async () => {
     await Nina.init({
       endpoint: 'http://ec2-18-224-24-103.us-east-2.compute.amazonaws.com:3001/v1',
@@ -856,7 +856,7 @@ describe("Migrate Release V1 to V2", async () => {
     expect(releases[0].programId).to.equal(ninaV1ProgramId.toString());
   })
 
-  it.only("Migrate one release from V1 to V2", async() => {
+  it("Migrate one release from V1 to V2", async() => {
     let releases = await getReleasesFromV1(1, 0, 1);
     let tries = 0;
     while (releases.length === 0) {
@@ -894,7 +894,7 @@ describe("Migrate Release V1 to V2", async () => {
     expect(Number(v2ReleaseData.price)).to.equal(Number(release.accountData.release.price));
   })
 
-  it.only("Migrate one release from V1 to V2", async() => {
+  it("Migrate one release from V1 to V2 and update metaplex metadata", async() => {
     let releases = await getReleasesFromV1(1, 0, 1);
     let tries = 0;
     while (releases.length === 0) {
@@ -906,7 +906,7 @@ describe("Migrate Release V1 to V2", async () => {
     }
     const release = releases[0];
 
-    const { v2Release, v1ReleasePublicKey, authorityPublicKey, releaseMintPublicKey,  paymentMintPublicKey, v2AuthorityTokenAccount, v2ReleaseSigner, metadata } = await migrateReleaseFromV1ToV2(release);
+    const { v2Release, v1ReleasePublicKey, authorityPublicKey, releaseMintPublicKey,  paymentMintPublicKey, v2AuthorityTokenAccount, v2ReleaseSigner, v2ReleaseSignerBump, metadata } = await migrateReleaseFromV1ToV2(release);
     console.log('v2Release', v2Release);
     console.log('v1ReleasePublicKey', v1ReleasePublicKey);
     console.log('authorityPublicKey', authorityPublicKey);
@@ -930,6 +930,57 @@ describe("Migrate Release V1 to V2", async () => {
     const expectedTotalSupply = release.accountData.release.totalSupply === -1 ? Number(MAX_U64) : release.accountData.release.totalSupply;
     expect(Number(v2ReleaseData.totalSupply)).to.equal(expectedTotalSupply);
     expect(Number(v2ReleaseData.price)).to.equal(Number(release.accountData.release.price));
+
+    const metadataProgram = new anchor.web3.PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s')
+    const [metadataV2] = await anchor.web3.PublicKey.findProgramAddress(
+      [Buffer.from('metadata'), metadataProgram.toBuffer(), releaseMintPublicKey.toBuffer()],
+      metadataProgram,
+    );
+
+    const metadataData = {
+      name: `Nina with the Nina`,
+      symbol: `NINA`,
+      uri: `https://arweave.net`,
+      sellerFeeBasisPoints: 2000,
+    }
+
+    const ix = await program.methods
+      .releaseUpdateMetaplex(
+        metadataData,
+        v2ReleaseSignerBump,
+      )
+      .accountsStrict({
+        payer: provider.wallet.publicKey,
+        authority: authorityPublicKey,
+        release: v2Release,
+        releaseSigner: v2ReleaseSigner,
+        releaseMint: releaseMintPublicKey,
+        metadata: metadataV2,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        metadataProgram,
+        systemProgram: anchor.web3.SystemProgram.programId,
+        rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+      })
+      .instruction();
+
+    const txid = await buildSignAndSendTransaction(
+      [modifyComputeUnits, addPriorityFee, ix],
+      provider.wallet.payer,
+      lightConnection,
+      [],
+    );
+    console.log('txid', txid);
+    if (txid) {
+      const latestBlockHash = await lightConnection.getLatestBlockhash();
+      await lightConnection.confirmTransaction(
+        {
+          blockhash: latestBlockHash.blockhash,
+          lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
+          signature: txid,
+        },
+        'finalized',
+      );
+    }
   })
 
 
@@ -1150,7 +1201,7 @@ const getReleasesFromV1 = async (limit: number = 100, offset: number = 0, total:
         }
       });
       if (limit > 1 && total === 0) {
-        total = releaseAccounts.total;
+        total = releaseAccounts.length;
       }
       if (allReleases.length >= total) {
         break;
@@ -1190,7 +1241,7 @@ const migrateReleaseFromV1ToV2 = async (release: any) => {
       ],
       program.programId
     );
-    const [v2ReleaseSigner] =
+    const [v2ReleaseSigner, v2ReleaseSignerBump] =
       anchor.web3.PublicKey.findProgramAddressSync(
         [v2Release.toBuffer()],
         program.programId
@@ -1308,6 +1359,7 @@ const migrateReleaseFromV1ToV2 = async (release: any) => {
       royaltyTokenAccountPublicKey,
       v2AuthorityTokenAccount,
       v2ReleaseSigner,
+      v2ReleaseSignerBump,
       metadata,
     }
   } catch (error) {
